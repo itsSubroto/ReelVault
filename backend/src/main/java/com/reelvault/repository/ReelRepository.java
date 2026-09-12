@@ -18,9 +18,17 @@ public interface ReelRepository extends JpaRepository<Reel, UUID> {
 
     long countByCollectionId(UUID collectionId);
 
-    @Query("SELECT r FROM Reel r WHERE LOWER(r.caption) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM Reel r WHERE (" +
+           "LOWER(COALESCE(r.caption, '')) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(COALESCE(r.transcript, '')) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(COALESCE(r.summary, '')) LIKE LOWER(CONCAT('%', :query, '%'))" +
+           ") ORDER BY r.createdAt DESC")
     List<Reel> searchByCaption(@Param("query") String query);
 
-    @Query("SELECT r FROM Reel r WHERE r.collection.id = :collectionId AND LOWER(r.caption) LIKE LOWER(CONCAT('%', :query, '%')) ORDER BY r.createdAt DESC")
+    @Query("SELECT r FROM Reel r WHERE r.collection.id = :collectionId AND (" +
+           "LOWER(COALESCE(r.caption, '')) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(COALESCE(r.transcript, '')) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(COALESCE(r.summary, '')) LIKE LOWER(CONCAT('%', :query, '%'))" +
+           ") ORDER BY r.createdAt DESC")
     List<Reel> searchByCollectionAndCaption(@Param("collectionId") UUID collectionId, @Param("query") String query);
 }

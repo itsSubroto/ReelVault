@@ -52,13 +52,13 @@ Yeh ek **learning project** bhi hai — do log alag-alag stacks (Java/Spring Boo
 
 **Goal:** Make search work even when the caption doesn't mention the keyword — i.e., search what's actually *said* in the reel.
 
-- [ ] Python service: `/process-reel` endpoint — download video (yt-dlp), transcribe (Whisper)
-- [ ] Python service: summarize + auto-generate tags via LLM
-- [ ] Python service: call back to Spring Boot (`PATCH /reels/{id}`) with transcript, summary, tags
-- [ ] Spring Boot: trigger the Python service asynchronously right after a reel is saved
-- [ ] Spring Boot: extend search to cover transcript + summary + tags (not just caption)
-- [ ] Add a `status` indicator in the UI (pending / processing / done) so you know when a reel is searchable
-- [ ] Handle failures gracefully (retry or mark `failed` instead of getting stuck)
+- [x] Python service: `/process-reel` endpoint — download video (yt-dlp), transcribe (Whisper)
+- [x] Python service: summarize + auto-generate tags via LLM
+- [x] Python service: call back to Spring Boot (`PATCH /reels/{id}`) with transcript, summary, tags
+- [x] Spring Boot: trigger the Python service asynchronously right after a reel is saved
+- [x] Spring Boot: extend search to cover transcript + summary + tags (not just caption)
+- [x] Add a `status` indicator in the UI (pending / processing / done) so you know when a reel is searchable
+- [x] Handle failures gracefully (retry or mark `failed` instead of getting stuck)
 
 **Outcome:** Search a keyword like "fast downloader" and get reels where that phrase was only spoken in the video, never written in the caption.
 

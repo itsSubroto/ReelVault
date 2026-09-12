@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,13 +57,31 @@ public class InstagramService {
     }
 
     /**
-     * Attempts to fetch metadata via Instagram oEmbed API, falling back to sensible defaults.
+     * Attempts to fetch metadata via Python AI service (yt-dlp) or Instagram oEmbed API, falling back gracefully.
      */
     public InstagramMetadata fetchMetadata(String url) {
         String shortcode = extractShortcode(url);
         String cleanUrl = "https://www.instagram.com/reel/" + shortcode + "/";
 
-        // 1. If Meta Access Token is available, use Meta Graph API oEmbed
+        // 1. Try Python AI metadata extractor (which uses yt-dlp without needing tokens)
+        try {
+            String aiMetadataUrl = "http://localhost:8000/api/metadata/?url=" + URLEncoder.encode(cleanUrl, StandardCharsets.UTF_8);
+            ResponseEntity<String> response = restTemplate.getForEntity(aiMetadataUrl, String.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                JsonNode root = objectMapper.readTree(response.getBody());
+                String caption = root.hasNonNull("caption") ? root.get("caption").asText() : "";
+                String thumbnailUrl = root.hasNonNull("thumbnail_url") ? root.get("thumbnail_url").asText() : null;
+                String authorName = root.hasNonNull("author_name") ? root.get("author_name").asText() : null;
+                if (thumbnailUrl != null || (caption != null && !caption.isBlank())) {
+                    log.info("Successfully fetched real metadata from Python service for shortcode: {}", shortcode);
+                    return new InstagramMetadata(shortcode, caption, thumbnailUrl, authorName);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Python metadata service unavailable: {}", e.getMessage());
+        }
+
+        // 2. If Meta Access Token is available, use Meta Graph API oEmbed
         if (accessToken != null && !accessToken.isBlank()) {
             try {
                 String oEmbedUrl = "https://graph.facebook.com/v12.0/instagram_oembed?url=" + cleanUrl + "&access_token=" + accessToken;
@@ -72,7 +92,7 @@ public class InstagramService {
             }
         }
 
-        // 2. Try standard Instagram oEmbed endpoint
+        // 3. Try standard Instagram oEmbed endpoint
         try {
             String publicOEmbedUrl = "https://api.instagram.com/oembed/?url=" + cleanUrl;
             InstagramMetadata meta = callOEmbed(publicOEmbedUrl, shortcode);
@@ -81,7 +101,7 @@ public class InstagramService {
             log.warn("Instagram public oEmbed unavailable for shortcode {}: {}", shortcode, e.getMessage());
         }
 
-        // 3. Resilient Fallback: Ensure saving is never blocked
+        // 4. Resilient Fallback: Ensure saving is never blocked
         log.info("Using fallback metadata for reel shortcode {}", shortcode);
         return new InstagramMetadata(
                 shortcode,

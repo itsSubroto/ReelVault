@@ -72,4 +72,19 @@ export const api = {
     const res = await fetch(`${API_BASE}/search?${params.toString()}`);
     return handleResponse(res);
   },
+
+  // AI Processing & Sync
+  async processReel(id) {
+    const res = await fetch(`${API_BASE}/reels/${id}/process`, {
+      method: 'POST',
+    });
+    return handleResponse(res);
+  },
+
+  async syncAllReels() {
+    const res = await fetch(`${API_BASE}/reels/sync-all`, {
+      method: 'POST',
+    });
+    return handleResponse(res);
+  },
 };

@@ -7,6 +7,7 @@ export default function ReelGrid({
   isLoading,
   searchQuery,
   onDeleteReel,
+  onProcessReel,
   onOpenSaveModal,
 }) {
   if (isLoading) {
@@ -74,6 +75,7 @@ export default function ReelGrid({
           reel={reel}
           searchQuery={searchQuery}
           onDeleteReel={onDeleteReel}
+          onProcessReel={onProcessReel}
         />
       ))}
     </div>

@@ -48,4 +48,15 @@ public class ReelController {
             @RequestBody ReelUpdateRequest request) {
         return ResponseEntity.ok(reelService.updateReel(id, request));
     }
+
+    @PostMapping("/{id}/process")
+    public ResponseEntity<Void> triggerProcessing(@PathVariable UUID id) {
+        reelService.triggerProcessing(id);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/sync-all")
+    public ResponseEntity<java.util.Map<String, Object>> syncAllReels() {
+        return ResponseEntity.ok(reelService.syncAllReels());
+    }
 }

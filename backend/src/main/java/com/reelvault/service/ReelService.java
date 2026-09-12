@@ -1,5 +1,6 @@
 package com.reelvault.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reelvault.dto.ReelRequest;
 import com.reelvault.dto.ReelResponse;
 import com.reelvault.dto.ReelUpdateRequest;
@@ -8,23 +9,41 @@ import com.reelvault.entity.Reel;
 import com.reelvault.entity.ReelStatus;
 import com.reelvault.exception.ResourceNotFoundException;
 import com.reelvault.repository.ReelRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ReelService {
 
     private final ReelRepository reelRepository;
     private final CollectionService collectionService;
     private final InstagramService instagramService;
+    private final ObjectMapper objectMapper;
+
+    public ReelService(
+            ReelRepository reelRepository,
+            CollectionService collectionService,
+            InstagramService instagramService,
+            ObjectMapper objectMapper) {
+        this.reelRepository = reelRepository;
+        this.collectionService = collectionService;
+        this.instagramService = instagramService;
+        this.objectMapper = objectMapper;
+    }
 
     @Transactional
     public ReelResponse saveReel(ReelRequest request) {
@@ -45,6 +64,10 @@ public class ReelService {
 
         Reel saved = reelRepository.save(reel);
         log.info("Saved reel shortcode: {} to collection: {}", saved.getShortcode(), collection.getName());
+
+        // Asynchronously notify Python AI service
+        triggerAiProcessing(saved.getId(), saved.getInstagramUrl());
+
         return toResponse(saved);
     }
 
@@ -79,6 +102,12 @@ public class ReelService {
         if (request.caption() != null) {
             reel.setCaption(request.caption());
         }
+        if (request.thumbnailUrl() != null) {
+            reel.setThumbnailUrl(request.thumbnailUrl());
+        }
+        if (request.authorName() != null) {
+            reel.setAuthorName(request.authorName());
+        }
         if (request.transcript() != null) {
             reel.setTranscript(request.transcript());
         }
@@ -94,6 +123,57 @@ public class ReelService {
 
         Reel updated = reelRepository.save(reel);
         return toResponse(updated);
+    }
+
+    public void triggerProcessing(UUID id) {
+        Reel reel = findEntityById(id);
+        triggerAiProcessing(reel.getId(), reel.getInstagramUrl());
+    }
+
+    public Map<String, Object> syncAllReels() {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+
+            String jsonBody = "{}";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setContentLength(jsonBody.getBytes(StandardCharsets.UTF_8).length);
+            HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    "http://localhost:8000/api/reprocess-all/",
+                    entity,
+                    Map.class
+            );
+            return response.getBody() != null ? response.getBody() : Map.of("status", "sent");
+        } catch (Exception e) {
+            log.error("Failed to connect to Python AI service: {}", e.getMessage());
+            return Map.of("error", "Python AI service is not running on port 8000: " + e.getMessage());
+        }
+    }
+
+    private void triggerAiProcessing(UUID reelId, String url) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                RestTemplate restTemplate = new RestTemplate();
+
+                Map<String, String> payload = Map.of(
+                        "reel_id", reelId.toString(),
+                        "instagram_url", url
+                );
+                String jsonBody = objectMapper.writeValueAsString(payload);
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.setContentLength(jsonBody.getBytes(StandardCharsets.UTF_8).length);
+                HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
+
+                restTemplate.postForEntity("http://localhost:8000/api/process-reel/", entity, String.class);
+                log.info("Successfully triggered AI service for reel: {}", reelId);
+            } catch (Exception e) {
+                log.warn("Python AI service notification error for reel {}: {}", reelId, e.getMessage());
+            }
+        });
     }
 
     public Reel findEntityById(UUID id) {

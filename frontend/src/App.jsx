@@ -13,6 +13,7 @@ export default function App() {
   const [reels, setReels] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isCreateCollectionModalOpen, setIsCreateCollectionModalOpen] = useState(false);
   const [errorBanner, setErrorBanner] = useState(null);
@@ -28,8 +29,8 @@ export default function App() {
   }, []);
 
   // Fetch reels based on active collection or search
-  const loadReels = useCallback(async () => {
-    setIsLoading(true);
+  const loadReels = useCallback(async (showLoadingState = true) => {
+    if (showLoadingState) setIsLoading(true);
     try {
       if (searchQuery.trim()) {
         const results = await api.search(searchQuery.trim(), selectedCollectionId);
@@ -43,7 +44,7 @@ export default function App() {
       console.error('Failed to fetch reels:', err);
       setErrorBanner('Could not load reels. Please ensure the backend is running.');
     } finally {
-      setIsLoading(false);
+      if (showLoadingState) setIsLoading(false);
     }
   }, [searchQuery, selectedCollectionId]);
 
@@ -60,10 +61,55 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [loadReels]);
 
+  // Auto-poll when any reel is currently PROCESSING
+  useEffect(() => {
+    const hasProcessing = reels.some((r) => r.status === 'PROCESSING');
+    if (!hasProcessing) return;
+
+    const interval = setInterval(() => {
+      loadReels(false);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [reels, loadReels]);
+
   // Handle Reel Save
   const handleSaveReel = async (url, collectionId) => {
     await api.saveReel(url, collectionId);
     await Promise.all([loadReels(), loadCollections()]);
+  };
+
+  // Handle Single Reel AI Processing
+  const handleProcessReel = async (id) => {
+    try {
+      await api.processReel(id);
+      // Mark as PROCESSING locally for instant feedback
+      setReels((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: 'PROCESSING' } : r))
+      );
+      setTimeout(() => loadReels(false), 2000);
+    } catch (err) {
+      alert('Failed to trigger processing: ' + err.message);
+    }
+  };
+
+  // Handle Sync All Reels
+  const handleSyncAll = async () => {
+    try {
+      setIsSyncing(true);
+      await api.syncAllReels();
+      // Set all to processing
+      setReels((prev) =>
+        prev.map((r) => (!r.thumbnailUrl || r.status === 'SAVED' ? { ...r, status: 'PROCESSING' } : r))
+      );
+      setTimeout(() => {
+        loadReels(false);
+        setIsSyncing(false);
+      }, 3000);
+    } catch (err) {
+      alert('Failed to sync reels: ' + err.message);
+      setIsSyncing(false);
+    }
   };
 
   // Handle Reel Delete
@@ -111,6 +157,8 @@ export default function App() {
         onSearchChange={setSearchQuery}
         onOpenSaveModal={() => setIsSaveModalOpen(true)}
         onOpenCreateCollectionModal={() => setIsCreateCollectionModalOpen(true)}
+        onSyncAll={handleSyncAll}
+        isSyncing={isSyncing}
       />
 
       {/* Main Container */}
@@ -156,7 +204,7 @@ export default function App() {
             {/* Quick stats / tips */}
             <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-900/40 px-3 py-1.5 rounded-xl border border-slate-800">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Instant caption keyword search</span>
+              <span>AI Search: Caption + Transcript + Summary + Tags</span>
             </div>
           </div>
 
@@ -166,6 +214,7 @@ export default function App() {
             isLoading={isLoading}
             searchQuery={searchQuery}
             onDeleteReel={handleDeleteReel}
+            onProcessReel={handleProcessReel}
             onOpenSaveModal={() => setIsSaveModalOpen(true)}
           />
         </section>

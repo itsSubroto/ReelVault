@@ -1,11 +1,13 @@
 import React from 'react';
-import { Film, Search, Plus, X, FolderPlus } from 'lucide-react';
+import { Film, Search, Plus, X, FolderPlus, RefreshCw } from 'lucide-react';
 
 export default function Navbar({
   searchQuery,
   onSearchChange,
   onOpenSaveModal,
   onOpenCreateCollectionModal,
+  onSyncAll,
+  isSyncing,
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
@@ -33,7 +35,7 @@ export default function Navbar({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search saved reels by keyword in caption..."
+              placeholder="Search reels by caption, transcript, summary, or tags..."
               className="w-full pl-9 pr-9 py-2 rounded-xl bg-slate-950/70 border border-slate-700/60 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
             />
             {searchQuery && (
@@ -50,6 +52,18 @@ export default function Navbar({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
+          {onSyncAll && (
+            <button
+              onClick={onSyncAll}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors disabled:opacity-50"
+              title="Sync thumbnails & AI metadata for all saved reels"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-violet-400 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync AI'}</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenCreateCollectionModal}
             className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors"
