@@ -19,8 +19,11 @@ import java.util.regex.Pattern;
 @Slf4j
 public class InstagramService {
 
-    private static final Pattern REEL_URL_PATTERN =
+    private static final Pattern INSTAGRAM_PATTERN =
             Pattern.compile("(?:instagram\\.com\\/(?:reel|reels|p)\\/)([a-zA-Z0-9_-]+)", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern YOUTUBE_PATTERN =
+            Pattern.compile("(?:youtube\\.com\\/shorts\\/|youtu\\.be\\/|youtube\\.com\\/watch\\?v=)([a-zA-Z0-9_-]+)", Pattern.CASE_INSENSITIVE);
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -41,32 +44,52 @@ public class InstagramService {
     ) {}
 
     /**
-     * Extracts the shortcode from an Instagram URL.
+     * Extracts the shortcode from an Instagram Reel or YouTube Short URL.
      */
     public String extractShortcode(String url) {
         if (url == null || url.isBlank()) {
-            throw new BadRequestException("Instagram URL must not be empty");
+            throw new BadRequestException("Video URL must not be empty");
         }
 
-        Matcher matcher = REEL_URL_PATTERN.matcher(url.trim());
-        if (matcher.find()) {
-            return matcher.group(1);
+        String trimmed = url.trim();
+        Matcher igMatcher = INSTAGRAM_PATTERN.matcher(trimmed);
+        if (igMatcher.find()) {
+            return igMatcher.group(1);
         }
 
-        throw new BadRequestException("Invalid Instagram URL. Expected format: https://www.instagram.com/reel/<shortcode>/");
+        Matcher ytMatcher = YOUTUBE_PATTERN.matcher(trimmed);
+        if (ytMatcher.find()) {
+            return ytMatcher.group(1);
+        }
+
+        throw new BadRequestException("Invalid Instagram URL or YouTube Short. Expected format: https://www.instagram.com/reel/<shortcode>/ or https://www.youtube.com/shorts/<id>");
+    }
+
+    public boolean isYouTube(String url) {
+        return url != null && (url.contains("youtube.com") || url.contains("youtu.be"));
     }
 
     /**
-     * Attempts to fetch metadata via Python AI service (yt-dlp) or Instagram oEmbed API, falling back gracefully.
+     * Attempts to fetch metadata via Python AI service (yt-dlp) or oEmbed APIs, falling back gracefully.
      */
     public InstagramMetadata fetchMetadata(String url) {
         String shortcode = extractShortcode(url);
-        String cleanUrl = "https://www.instagram.com/reel/" + shortcode + "/";
+        boolean isYt = isYouTube(url);
+        String cleanUrl = isYt
+                ? "https://www.youtube.com/shorts/" + shortcode
+                : "https://www.instagram.com/reel/" + shortcode + "/";
+        String fallbackPlatform = isYt ? "YouTube Short" : "Instagram Reel";
+        String fallbackCreator = isYt ? "YouTube Creator" : "Instagram Creator";
 
-        // 1. Try Python AI metadata extractor (which uses yt-dlp without needing tokens)
+        // 1. Try Python AI metadata extractor (yt-dlp handles both Instagram and YouTube)
         try {
-            String aiMetadataUrl = "http://localhost:8000/api/metadata/?url=" + URLEncoder.encode(cleanUrl, StandardCharsets.UTF_8);
-            ResponseEntity<String> response = restTemplate.getForEntity(aiMetadataUrl, String.class);
+            URI uri = org.springframework.web.util.UriComponentsBuilder
+                    .fromUriString("http://localhost:8000/api/metadata")
+                    .queryParam("url", cleanUrl)
+                    .build()
+                    .toUri();
+
+            ResponseEntity<String> response = restTemplate.getForEntity(uri, String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 JsonNode root = objectMapper.readTree(response.getBody());
                 String caption = root.hasNonNull("caption") ? root.get("caption").asText() : "";
@@ -81,33 +104,44 @@ public class InstagramService {
             log.debug("Python metadata service unavailable: {}", e.getMessage());
         }
 
-        // 2. If Meta Access Token is available, use Meta Graph API oEmbed
-        if (accessToken != null && !accessToken.isBlank()) {
+        // 2. If YouTube, try YouTube oEmbed
+        if (isYt) {
             try {
-                String oEmbedUrl = "https://graph.facebook.com/v12.0/instagram_oembed?url=" + cleanUrl + "&access_token=" + accessToken;
-                InstagramMetadata meta = callOEmbed(oEmbedUrl, shortcode);
+                String ytOEmbedUrl = "https://www.youtube.com/oembed?url=" + cleanUrl + "&format=json";
+                InstagramMetadata meta = callOEmbed(ytOEmbedUrl, shortcode);
                 if (meta != null) return meta;
             } catch (Exception e) {
-                log.warn("Meta Graph oEmbed failed for shortcode {}: {}", shortcode, e.getMessage());
+                log.warn("YouTube oEmbed failed for shortcode {}: {}", shortcode, e.getMessage());
+            }
+        } else {
+            // 3. Instagram oEmbed (with Meta token if available)
+            if (accessToken != null && !accessToken.isBlank()) {
+                try {
+                    String oEmbedUrl = "https://graph.facebook.com/v12.0/instagram_oembed?url=" + cleanUrl + "&access_token=" + accessToken;
+                    InstagramMetadata meta = callOEmbed(oEmbedUrl, shortcode);
+                    if (meta != null) return meta;
+                } catch (Exception e) {
+                    log.warn("Meta Graph oEmbed failed for shortcode {}: {}", shortcode, e.getMessage());
+                }
+            }
+
+            // 4. Try standard Instagram oEmbed endpoint
+            try {
+                String publicOEmbedUrl = "https://api.instagram.com/oembed/?url=" + cleanUrl;
+                InstagramMetadata meta = callOEmbed(publicOEmbedUrl, shortcode);
+                if (meta != null) return meta;
+            } catch (Exception e) {
+                log.warn("Instagram public oEmbed unavailable for shortcode {}: {}", shortcode, e.getMessage());
             }
         }
 
-        // 3. Try standard Instagram oEmbed endpoint
-        try {
-            String publicOEmbedUrl = "https://api.instagram.com/oembed/?url=" + cleanUrl;
-            InstagramMetadata meta = callOEmbed(publicOEmbedUrl, shortcode);
-            if (meta != null) return meta;
-        } catch (Exception e) {
-            log.warn("Instagram public oEmbed unavailable for shortcode {}: {}", shortcode, e.getMessage());
-        }
-
-        // 4. Resilient Fallback: Ensure saving is never blocked
-        log.info("Using fallback metadata for reel shortcode {}", shortcode);
+        // 5. Resilient Fallback: Ensure saving is never blocked
+        log.info("Using fallback metadata for {} shortcode {}", fallbackPlatform, shortcode);
         return new InstagramMetadata(
                 shortcode,
-                "Saved Instagram Reel (" + shortcode + ")",
+                "Saved " + fallbackPlatform + " (" + shortcode + ")",
                 null,
-                "Instagram Creator"
+                fallbackCreator
         );
     }
 

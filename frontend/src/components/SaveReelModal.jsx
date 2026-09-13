@@ -12,8 +12,9 @@ export default function SaveReelModal({
   const [collectionId, setCollectionId] = useState(defaultCollectionId || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const inputRef = React.useRef(null);
 
-  // Sync default collection when opened
+  // Sync default collection and auto-focus input when opened
   React.useEffect(() => {
     if (defaultCollectionId) {
       setCollectionId(defaultCollectionId);
@@ -22,12 +23,22 @@ export default function SaveReelModal({
     }
   }, [defaultCollectionId, collections]);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!url.trim()) {
-      setError('Please enter an Instagram reel URL');
+    const cleanUrl = url.trim();
+    if (!cleanUrl) {
+      setError('Please enter a video URL');
       return;
     }
     if (!collectionId) {
@@ -35,20 +46,30 @@ export default function SaveReelModal({
       return;
     }
 
-    // Basic format check
-    if (!url.includes('instagram.com/reel/') && !url.includes('instagram.com/p/') && !url.includes('instagram.com/reels/')) {
-      setError('Must be a valid Instagram Reel link (e.g. https://www.instagram.com/reel/...)');
+    // Dual platform check: Instagram Reels & YouTube Shorts
+    const isInstagram =
+      cleanUrl.includes('instagram.com/reel/') ||
+      cleanUrl.includes('instagram.com/p/') ||
+      cleanUrl.includes('instagram.com/reels/');
+
+    const isYouTube =
+      cleanUrl.includes('youtube.com/shorts/') ||
+      cleanUrl.includes('youtu.be/') ||
+      cleanUrl.includes('youtube.com/watch');
+
+    if (!isInstagram && !isYouTube) {
+      setError('Must be an Instagram Reel (instagram.com/reel/...) or YouTube Short (youtube.com/shorts/...)');
       return;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      await onSave(url.trim(), collectionId);
+      await onSave(cleanUrl, collectionId);
       setUrl('');
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to save reel');
+      setError(err.message || 'Failed to save video');
     } finally {
       setIsLoading(false);
     }
@@ -68,10 +89,10 @@ export default function SaveReelModal({
 
         <h3 className="text-lg font-bold text-slate-100 mb-1 flex items-center gap-2">
           <LinkIcon className="w-5 h-5 text-violet-400" />
-          <span>Save Instagram Reel</span>
+          <span>Save Reel or Short</span>
         </h3>
         <p className="text-xs text-slate-400 mb-5">
-          Paste the reel link to automatically fetch its caption, preview, and organize it.
+          Paste an Instagram Reel or YouTube Short URL to automatically fetch its thumbnail, creator, and AI summary.
         </p>
 
         {error && (
@@ -85,9 +106,10 @@ export default function SaveReelModal({
           {/* Reel Link Input */}
           <div>
             <label className="block text-xs font-medium text-slate-300 mb-1.5">
-              Instagram Reel URL
+              Reel / Short URL
             </label>
             <input
+              ref={inputRef}
               type="url"
               required
               value={url}
@@ -95,7 +117,7 @@ export default function SaveReelModal({
                 setUrl(e.target.value);
                 setError(null);
               }}
-              placeholder="https://www.instagram.com/reel/C8XYZ123456/"
+              placeholder="https://www.instagram.com/reel/... or https://youtube.com/shorts/..."
               disabled={isLoading}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
             />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ExternalLink, Trash2, Film, Folder, Calendar, Sparkles, RefreshCw, Loader2, Tag } from 'lucide-react';
+import { ExternalLink, Trash2, Film, Folder, Calendar, Sparkles, RefreshCw, Loader2, Tag, Play } from 'lucide-react';
 
 function highlightText(text, query) {
   if (!query || !text) return text;
@@ -24,10 +24,9 @@ export default function ReelCard({
   searchQuery,
   onDeleteReel,
   onProcessReel,
+  onPlayReel,
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const formattedDate = reel.createdAt
@@ -37,10 +36,14 @@ export default function ReelCard({
       })
     : '';
 
-  const caption = reel.caption || 'No caption available.';
-  const isLongCaption = caption.length > 140;
+  const isYouTube =
+    (reel.instagramUrl && (reel.instagramUrl.includes('youtube.com') || reel.instagramUrl.includes('youtu.be'))) ||
+    reel.shortcode?.length === 11;
 
-  const handleProcess = async () => {
+  const caption = reel.caption || 'No caption available.';
+
+  const handleProcess = async (e) => {
+    e.stopPropagation();
     if (!onProcessReel || isProcessing) return;
     try {
       setIsProcessing(true);
@@ -50,6 +53,11 @@ export default function ReelCard({
     } finally {
       setTimeout(() => setIsProcessing(false), 1500);
     }
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    onDeleteReel(reel.id);
   };
 
   const getStatusBadge = () => {
@@ -85,13 +93,13 @@ export default function ReelCard({
   };
 
   return (
-    <article className="group relative bg-slate-900/80 border border-slate-800 hover:border-violet-500/50 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:shadow-violet-500/10 hover:-translate-y-0.5 flex flex-col">
-      {/* Thumbnail Header */}
-      <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden flex items-center justify-center">
+    <article className="group relative bg-slate-900/80 border border-slate-800 hover:border-violet-500/50 rounded-2xl overflow-hidden shadow-lg transition-all duration-300 hover:shadow-violet-500/10 hover:-translate-y-0.5 flex flex-col h-[520px]">
+      {/* Thumbnail Header with Play Trigger */}
+      <div className="relative aspect-[4/3] bg-slate-950 overflow-hidden flex items-center justify-center shrink-0">
         {reel.thumbnailUrl && !imageError ? (
           <img
             src={reel.thumbnailUrl}
-            alt={reel.caption || 'Instagram Reel'}
+            alt={reel.caption || 'Video preview'}
             referrerPolicy="no-referrer"
             crossOrigin="anonymous"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -102,7 +110,7 @@ export default function ReelCard({
           <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-slate-600 p-4 text-center">
             <Film className="w-10 h-10 stroke-[1.5] text-violet-500/50 mb-2" />
             <span className="text-xs font-semibold text-slate-400">
-              @{reel.authorName || 'instagram_creator'}
+              @{reel.authorName || (isYouTube ? 'youtube_creator' : 'instagram_creator')}
             </span>
             <span className="text-[10px] font-mono text-slate-600 mt-1">
               #{reel.shortcode}
@@ -110,27 +118,38 @@ export default function ReelCard({
           </div>
         )}
 
+        {/* Hover Play Button Overlay */}
+        <button
+          onClick={() => onPlayReel && onPlayReel(reel)}
+          className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/45 opacity-90 group-hover:opacity-100 transition-all cursor-pointer"
+          title="Play video in floating window"
+        >
+          <div className="w-12 h-12 rounded-full bg-violet-600/90 hover:bg-violet-500 text-white flex items-center justify-center shadow-lg shadow-violet-600/40 group-hover:scale-110 transition-transform">
+            <Play className="w-5 h-5 fill-current ml-0.5" />
+          </div>
+        </button>
+
         {/* Collection Badge */}
         {reel.collectionName && (
-          <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-[11px] font-medium text-slate-300 shadow">
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-[11px] font-medium text-slate-300 shadow pointer-events-none">
             <Folder className="w-3 h-3 text-violet-400" />
             <span>{reel.collectionName}</span>
           </div>
         )}
 
         {/* Quick Actions (Top Right) */}
-        <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+        <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all z-10">
           <button
             onClick={handleProcess}
             disabled={isProcessing}
-            className="p-1.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-slate-400 hover:text-violet-400 hover:bg-violet-500/20 transition-all shadow"
+            className="p-1.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-slate-400 hover:text-violet-400 hover:bg-violet-500/20 transition-all shadow cursor-pointer"
             title="Extract thumbnail & process with AI"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isProcessing ? 'animate-spin text-violet-400' : ''}`} />
           </button>
           <button
-            onClick={() => onDeleteReel(reel.id)}
-            className="p-1.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-slate-400 hover:text-red-400 hover:bg-red-500/20 transition-all shadow"
+            onClick={handleDelete}
+            className="p-1.5 rounded-full bg-slate-950/80 backdrop-blur-md border border-slate-800 text-slate-400 hover:text-red-400 hover:bg-red-500/20 transition-all shadow cursor-pointer"
             title="Delete reel"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -138,17 +157,17 @@ export default function ReelCard({
         </div>
 
         {/* Status Tag (Bottom Left) */}
-        <div className="absolute bottom-3 left-3">
+        <div className="absolute bottom-3 left-3 pointer-events-none">
           {getStatusBadge()}
         </div>
       </div>
 
-      {/* Card Body */}
-      <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-        {/* Author & Date */}
-        <div className="flex items-center justify-between text-xs text-slate-400">
+      {/* Card Body with Constant Height & Scrollable Content */}
+      <div className="p-4 flex-1 flex flex-col justify-between overflow-hidden">
+        {/* Author & Date Header */}
+        <div className="flex items-center justify-between text-xs text-slate-400 shrink-0 mb-2">
           <span className="font-semibold text-slate-200 truncate max-w-[180px]">
-            {reel.authorName ? `@${reel.authorName}` : '@instagram_creator'}
+            {reel.authorName ? `@${reel.authorName}` : (isYouTube ? '@youtube_creator' : '@instagram_creator')}
           </span>
           {formattedDate && (
             <span className="flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
@@ -158,63 +177,64 @@ export default function ReelCard({
           )}
         </div>
 
-        {/* Caption */}
-        <div className="text-xs sm:text-sm text-slate-300 leading-relaxed break-words flex-1">
-          <p className="whitespace-pre-line">
-            {isExpanded || !isLongCaption
-              ? highlightText(caption, searchQuery)
-              : highlightText(caption.slice(0, 140) + '...', searchQuery)}
-          </p>
-          {isLongCaption && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="mt-1 text-xs text-violet-400 hover:text-violet-300 font-medium cursor-pointer"
-            >
-              {isExpanded ? 'Show less' : 'Read more'}
-            </button>
+        {/* Scrollable Middle Content (Caption, AI Summary, Tags) */}
+        <div className="flex-1 overflow-y-auto pr-1.5 space-y-2.5 text-xs text-slate-300 leading-relaxed scrollbar-thin">
+          {/* Caption */}
+          <div className="break-words">
+            <p className="whitespace-pre-line text-xs sm:text-[13px] text-slate-300">
+              {highlightText(caption, searchQuery)}
+            </p>
+          </div>
+
+          {/* AI Summary Box */}
+          {reel.summary && (
+            <div className="p-2.5 rounded-xl bg-violet-950/40 border border-violet-800/30 text-xs text-violet-200">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold flex items-center gap-1 text-[11px] text-violet-300">
+                  <Sparkles className="w-3 h-3 text-amber-400" />
+                  AI Summary
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-normal">
+                {highlightText(reel.summary, searchQuery)}
+              </p>
+            </div>
+          )}
+
+          {/* Tags */}
+          {reel.tags && reel.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {reel.tags.map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800/70 text-slate-300 border border-slate-700/50"
+                >
+                  <Tag className="w-2.5 h-2.5 text-violet-400" />
+                  <span>{tag}</span>
+                </span>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* AI Summary Box (if present) */}
-        {reel.summary && (
-          <div className="p-2.5 rounded-xl bg-violet-950/30 border border-violet-800/30 text-xs text-violet-200">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold flex items-center gap-1 text-[11px] text-violet-300">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                AI Summary
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-normal">
-              {highlightText(reel.summary, searchQuery)}
-            </p>
-          </div>
-        )}
-
-        {/* Tags */}
-        {reel.tags && reel.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {reel.tags.map((tag, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-800/70 text-slate-300 border border-slate-700/50"
-              >
-                <Tag className="w-2.5 h-2.5 text-violet-400" />
-                <span>{tag}</span>
-              </span>
-            ))}
-          </div>
-        )}
-
         {/* Card Footer Actions */}
-        <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between">
+        <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between shrink-0 mt-2">
+          <button
+            onClick={() => onPlayReel && onPlayReel(reel)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-violet-400 hover:text-violet-300 transition-colors cursor-pointer"
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            <span>Play Video</span>
+          </button>
+
           <a
             href={reel.instagramUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors"
+            className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-slate-200 transition-colors"
           >
-            <span>View on Instagram</span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <span>{isYouTube ? 'YouTube' : 'Instagram'}</span>
+            <ExternalLink className="w-3 h-3" />
           </a>
 
           <span className="text-[10px] font-mono text-slate-500">

@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import ReelGrid from './components/ReelGrid';
 import SaveReelModal from './components/SaveReelModal';
 import CreateCollectionModal from './components/CreateCollectionModal';
+import FloatingPlayerModal from './components/FloatingPlayerModal';
 import { api } from './api/client';
 import { Sparkles, AlertCircle } from 'lucide-react';
 
@@ -16,6 +17,8 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isCreateCollectionModalOpen, setIsCreateCollectionModalOpen] = useState(false);
+  const [activePlayingReel, setActivePlayingReel] = useState(null);
+  const [pollingUntil, setPollingUntil] = useState(0);
   const [errorBanner, setErrorBanner] = useState(null);
 
   // Fetch collections
@@ -61,29 +64,33 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [loadReels]);
 
-  // Auto-poll when any reel is currently PROCESSING
+  // Auto-poll when any reel is currently PROCESSING or during the post-save polling window
   useEffect(() => {
     const hasProcessing = reels.some((r) => r.status === 'PROCESSING');
-    if (!hasProcessing) return;
+    const isWindowActive = Date.now() < pollingUntil;
+
+    if (!hasProcessing && !isWindowActive) return;
 
     const interval = setInterval(() => {
       loadReels(false);
-    }, 2500);
+    }, 2000);
 
     return () => clearInterval(interval);
-  }, [reels, loadReels]);
+  }, [reels, pollingUntil, loadReels]);
 
   // Handle Reel Save
   const handleSaveReel = async (url, collectionId) => {
     await api.saveReel(url, collectionId);
-    await Promise.all([loadReels(), loadCollections()]);
+    // Keep active polling for 20s so the UI updates automatically as soon as AI enrichment finishes
+    setPollingUntil(Date.now() + 20000);
+    await Promise.all([loadReels(false), loadCollections()]);
   };
 
   // Handle Single Reel AI Processing
   const handleProcessReel = async (id) => {
     try {
       await api.processReel(id);
-      // Mark as PROCESSING locally for instant feedback
+      setPollingUntil(Date.now() + 15000);
       setReels((prev) =>
         prev.map((r) => (r.id === id ? { ...r, status: 'PROCESSING' } : r))
       );
@@ -98,14 +105,14 @@ export default function App() {
     try {
       setIsSyncing(true);
       await api.syncAllReels();
-      // Set all to processing
+      setPollingUntil(Date.now() + 25000);
       setReels((prev) =>
         prev.map((r) => (!r.thumbnailUrl || r.status === 'SAVED' ? { ...r, status: 'PROCESSING' } : r))
       );
       setTimeout(() => {
         loadReels(false);
         setIsSyncing(false);
-      }, 3000);
+      }, 2500);
     } catch (err) {
       alert('Failed to sync reels: ' + err.message);
       setIsSyncing(false);
@@ -187,7 +194,7 @@ export default function App() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                <span>{selectedCollection ? selectedCollection.name : 'All Saved Reels'}</span>
+                <span>{selectedCollection ? selectedCollection.name : 'All Saved Reels & Shorts'}</span>
                 {searchQuery && (
                   <span className="text-xs font-normal text-slate-400 font-mono">
                     matching "{searchQuery}"
@@ -197,7 +204,7 @@ export default function App() {
               <p className="text-xs text-slate-400 mt-0.5">
                 {selectedCollection?.description
                   ? selectedCollection.description
-                  : `${reels.length} ${reels.length === 1 ? 'reel' : 'reels'} saved`}
+                  : `${reels.length} ${reels.length === 1 ? 'video' : 'videos'} saved`}
               </p>
             </div>
 
@@ -216,9 +223,18 @@ export default function App() {
             onDeleteReel={handleDeleteReel}
             onProcessReel={handleProcessReel}
             onOpenSaveModal={() => setIsSaveModalOpen(true)}
+            onPlayReel={(reel) => setActivePlayingReel(reel)}
           />
         </section>
       </main>
+
+      {/* Floating Video Player Modal */}
+      {activePlayingReel && (
+        <FloatingPlayerModal
+          reel={activePlayingReel}
+          onClose={() => setActivePlayingReel(null)}
+        />
+      )}
 
       {/* Modals */}
       <SaveReelModal

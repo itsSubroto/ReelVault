@@ -108,47 +108,165 @@ class AiPipelineService:
     @classmethod
     def _generate_summary_and_tags(cls, caption: str, transcript: str) -> tuple[str, list[str]]:
         """
-        Generates 1-2 sentence summary and list of tags.
-        Uses OpenAI/Claude/Gemini if API key is provided, or smart NLP heuristic fallback.
+        Generates 1-2 sentence informative summary and list of tags.
+        Order of precedence:
+        1. Google Gemini (GEMINI_API_KEY / GOOGLE_API_KEY)
+        2. OpenAI (OPENAI_API_KEY)
+        3. Intelligent Local NLP Engine (heuristics, promo filtering, transcript keyword mining)
         """
+        prompt = (
+            "Summarize the core topic of this video in 1-2 clear, informative sentences (avoid clickbait hooks or promo phrases).\n"
+            "Then extract 4-6 relevant single-word lowercase tags derived from the summary and transcript.\n\n"
+            f"Caption:\n{caption}\n\n"
+            f"Spoken Transcript:\n{transcript}\n\n"
+            "Format your response EXACTLY as:\n"
+            "Summary: <1-2 sentence summary>\n"
+            "Tags: <comma-separated tags>"
+        )
+
+        # 1. Try Google Gemini API (zero external SDK dependencies needed)
+        gemini_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+        if gemini_key:
+            try:
+                gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+                resp = requests.post(
+                    gemini_url,
+                    json={
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 200}
+                    },
+                    timeout=12
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates and "content" in candidates[0]:
+                        text = candidates[0]["content"]["parts"][0].get("text", "")
+                        summary_match = re.search(r'Summary:\s*(.+?)(?:\n|Tags:|$)', text, re.DOTALL)
+                        tags_match = re.search(r'Tags:\s*(.+)', text)
+                        if summary_match and tags_match:
+                            summary = summary_match.group(1).strip()
+                            tags = [t.strip().lstrip('#').lower() for t in tags_match.group(1).split(',') if t.strip()]
+                            logger.info("Generated high-quality summary and tags using Google Gemini API")
+                            return summary, tags[:6]
+            except Exception as e:
+                logger.warning(f"Gemini API summarization failed ({e}). Proceeding to fallback.")
+
+        # 2. Try OpenAI API
         openai_key = os.getenv('OPENAI_API_KEY', '')
         if openai_key:
             try:
                 from openai import OpenAI
                 client = OpenAI(api_key=openai_key)
-                prompt = (
-                    f"Summarize this Instagram reel content in 1 concise sentence and extract 4-6 relevant single-word tags.\n"
-                    f"Caption: {caption}\nTranscript: {transcript}\n\n"
-                    f"Respond in format:\nSummary: <summary>\nTags: tag1, tag2, tag3"
-                )
                 res = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.3,
                 )
                 content = res.choices[0].message.content or ""
-                summary_match = re.search(r'Summary:\s*(.+)', content)
+                summary_match = re.search(r'Summary:\s*(.+?)(?:\n|Tags:|$)', content, re.DOTALL)
                 tags_match = re.search(r'Tags:\s*(.+)', content)
 
-                summary = summary_match.group(1).strip() if summary_match else caption[:150]
+                summary = summary_match.group(1).strip() if summary_match else ""
                 tags = [t.strip().lstrip('#').lower() for t in tags_match.group(1).split(',') if t.strip()] if tags_match else []
-                return summary, tags
+                if summary:
+                    logger.info("Generated summary and tags using OpenAI API")
+                    return summary, tags[:6]
             except Exception as e:
-                logger.warning(f"LLM API call failed, using local NLP extractor: {e}")
+                logger.warning(f"OpenAI API call failed ({e}). Proceeding to local NLP engine.")
 
-        # Smart rule-based / hashtag NLP fallback
-        hashtags = [tag.lstrip('#').lower() for tag in re.findall(r'#(\w+)', caption)]
+        # 3. Intelligent Local NLP Engine (Offline / No API Key required)
+        logger.info("Running local NLP pipeline for summarization and tag extraction")
+        return cls._local_nlp_summary_and_tags(caption, transcript)
 
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', caption.lower())
-        stopwords = {'this', 'that', 'with', 'from', 'have', 'more', 'your', 'about', 'link', 'follow', 'check', 'video', 'reel', 'like', 'comment'}
-        keywords = [w for w in words if w not in stopwords]
+    @classmethod
+    def _local_nlp_summary_and_tags(cls, caption: str, transcript: str) -> tuple[str, list[str]]:
+        """
+        Cleans clickbait, filters promotional lines, synthesizes meaningful summary,
+        and generates topical tags strictly from summary and transcript content.
+        """
+        promo_patterns = [
+            r'link\s*(in|on)\s*(bio|description)',
+            r'follow\s*(@|for)',
+            r'tap\s*the\s*link',
+            r'dm\s*for',
+            r'comment\s*below',
+            r'sale\s*is\s*live',
+            r'use\s*code',
+            r'discount',
+            r'flat\s*\d+%',
+            r'credit\s*:',
+            r'subscribe\s*to',
+            r'save\s*this',
+            r'share\s*with',
+            r'double\s*tap',
+        ]
+        promo_regex = re.compile('|'.join(promo_patterns), re.IGNORECASE)
 
-        combined_tags = list(dict.fromkeys(hashtags + keywords))[:6]
+        # Clean lines
+        informative_lines = []
+        for raw_line in caption.split('\n'):
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith('#'):
+                continue
+            # Remove URLs and handles
+            clean = re.sub(r'https?://\S+|www\.\S+|@\w+', '', line).strip()
+            # Remove emojis and excessive symbols
+            clean = re.sub(r'[^\w\s.,?!:;\'"()-]', '', clean).strip()
+            # Skip promotional or clickbait spam lines
+            if promo_regex.search(line) or len(clean.split()) < 3:
+                continue
+            informative_lines.append(clean)
 
-        clean_lines = [line.strip() for line in caption.split('\n') if line.strip() and not line.startswith('#')]
-        summary = clean_lines[0] if clean_lines else "Saved Instagram reel."
-        if len(summary) > 160:
-            summary = summary[:157] + "..."
+        # Synthesize summary:
+        # If spoken transcript is available and informative, prioritize it
+        has_real_transcript = transcript and "No spoken audio transcript available" not in transcript and len(transcript.strip()) > 20
+        if has_real_transcript:
+            clean_transcript = re.sub(r'\s+', ' ', transcript).strip()
+            sentences = re.split(r'(?<=[.?!])\s+', clean_transcript)
+            summary = ' '.join(sentences[:2]) if sentences else clean_transcript[:180]
+        elif informative_lines:
+            # Pick the most substantial informative sentences (avoid short 1-3 word hooks)
+            chosen = sorted(informative_lines[:4], key=lambda l: len(l), reverse=True)
+            summary = chosen[0]
+            if len(chosen) > 1 and len(summary) < 90:
+                summary += " " + chosen[1]
+        else:
+            # Fallback: clean whatever text is available
+            cleaned_caption = re.sub(r'#\w+|https?://\S+', '', caption).strip()
+            summary = cleaned_caption.split('\n')[0] if cleaned_caption else "Saved video post."
+
+        if len(summary) > 200:
+            summary = summary[:197].rsplit(' ', 1)[0] + "..."
+
+        # Tag Generation strictly derived from summary and transcript
+        text_for_tags = f"{summary} {transcript if has_real_transcript else ''}".lower()
+        extracted_words = re.findall(r'\b[a-zA-Z]{4,}\b', text_for_tags)
+
+        stopwords = {
+            'this', 'that', 'with', 'from', 'have', 'more', 'your', 'about', 'link', 'follow',
+            'check', 'video', 'reel', 'like', 'comment', 'here', 'what', 'when', 'where',
+            'which', 'will', 'make', 'just', 'look', 'their', 'there', 'they', 'them', 'some',
+            'saved', 'post', 'instagram', 'youtube', 'short', 'shorts', 'watch', 'want', 'know',
+            'give', 'good', 'best', 'great', 'also', 'then', 'than', 'into', 'only', 'over'
+        }
+
+        # Also extract relevant hashtags from the caption if they match topical words
+        caption_hashtags = [tag.lstrip('#').lower() for tag in re.findall(r'#(\w+)', caption) if len(tag) > 3 and tag.lower() not in stopwords]
+
+        # Calculate word frequencies for summary/transcript
+        word_freq = {}
+        for w in extracted_words:
+            if w not in stopwords:
+                word_freq[w] = word_freq.get(w, 0) + 1
+
+        sorted_words = sorted(word_freq.keys(), key=lambda w: word_freq[w], reverse=True)
+
+        combined_tags = list(dict.fromkeys(caption_hashtags[:3] + sorted_words))[:6]
+        if not combined_tags:
+            combined_tags = ["video", "content"]
 
         return summary, combined_tags
 

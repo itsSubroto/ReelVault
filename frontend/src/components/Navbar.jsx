@@ -9,6 +9,24 @@ export default function Navbar({
   onSyncAll,
   isSyncing,
 }) {
+  const searchInputRef = React.useRef(null);
+
+  // Global keyboard shortcut for search (Ctrl+K, Cmd+K, or '/')
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isInputActive = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === '/' && !isInputActive) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -32,21 +50,29 @@ export default function Navbar({
           <div className="relative flex items-center">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
             <input
+              ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search reels by caption, transcript, summary, or tags..."
-              className="w-full pl-9 pr-9 py-2 rounded-xl bg-slate-950/70 border border-slate-700/60 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
+              className="w-full pl-9 pr-20 py-2 rounded-xl bg-slate-950/70 border border-slate-700/60 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
             />
-            {searchQuery && (
-              <button
-                onClick={() => onSearchChange('')}
-                className="absolute right-3 text-slate-400 hover:text-slate-200"
-                title="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+            <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => onSearchChange('')}
+                  className="pointer-events-auto text-slate-400 hover:text-slate-200"
+                  title="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              ) : (
+                <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-800/80 border border-slate-700/60 rounded">
+                  <span className="text-[9px]">Ctrl</span> K
+                </kbd>
+              )}
+            </div>
           </div>
         </div>
 
