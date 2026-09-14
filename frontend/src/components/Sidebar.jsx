@@ -1,5 +1,5 @@
-import React from 'react';
-import { Layers, Folder, Plus, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Layers, Folder, Plus, Trash2, Search, X } from 'lucide-react';
 
 export default function Sidebar({
   collections,
@@ -9,6 +9,12 @@ export default function Sidebar({
   onDeleteCollection,
   totalReelsCount,
 }) {
+  const [collectionFilter, setCollectionFilter] = useState('');
+
+  const filteredCollections = collections.filter((c) =>
+    c.name.toLowerCase().includes(collectionFilter.toLowerCase().trim())
+  );
+
   return (
     <aside className="w-full md:w-64 shrink-0 space-y-4">
       <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4">
@@ -19,11 +25,32 @@ export default function Sidebar({
           </span>
           <button
             onClick={onOpenCreateCollectionModal}
-            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-violet-400 transition-colors"
+            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-violet-400 transition-colors cursor-pointer"
             title="Create new collection"
           >
             <Plus className="w-4 h-4" />
           </button>
+        </div>
+
+        {/* Collection Search / Filter Input */}
+        <div className="relative mb-3">
+          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5 pointer-events-none" />
+          <input
+            type="text"
+            value={collectionFilter}
+            onChange={(e) => setCollectionFilter(e.target.value)}
+            placeholder="Search collections..."
+            className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500/80 transition-all"
+          />
+          {collectionFilter && (
+            <button
+              onClick={() => setCollectionFilter('')}
+              className="absolute right-2 top-2 text-slate-500 hover:text-slate-300"
+              title="Clear filter"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Collections List */}
@@ -47,7 +74,7 @@ export default function Sidebar({
           </button>
 
           {/* User Collections */}
-          {collections.map((col) => {
+          {filteredCollections.map((col) => {
             const isSelected = selectedCollectionId === col.id;
             return (
               <div
@@ -77,7 +104,7 @@ export default function Sidebar({
                       e.stopPropagation();
                       onDeleteCollection(col.id, col.name);
                     }}
-                    className="hidden group-hover:block p-1 rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="hidden group-hover:block p-1 rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title={`Delete "${col.name}"`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -90,6 +117,12 @@ export default function Sidebar({
           {collections.length === 0 && (
             <div className="px-3 py-4 text-center text-xs text-slate-500">
               No collections yet. Create one to organize your reels!
+            </div>
+          )}
+
+          {collections.length > 0 && filteredCollections.length === 0 && (
+            <div className="px-3 py-3 text-center text-xs text-slate-500">
+              No matching collections found
             </div>
           )}
         </nav>

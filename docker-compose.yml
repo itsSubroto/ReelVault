@@ -37,6 +37,7 @@ services:
       - backend
     environment:
       SPRING_BOOT_URL: http://backend:8080
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "8000:8000"
 

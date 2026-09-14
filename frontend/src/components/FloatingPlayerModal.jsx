@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { X, ExternalLink, Maximize2, Minimize2, Sparkles, Tag, Film } from 'lucide-react';
 
 export default function FloatingPlayerModal({ reel, onClose }) {
@@ -6,13 +6,13 @@ export default function FloatingPlayerModal({ reel, onClose }) {
 
   if (!reel) return null;
 
-  const isYouTube =
-    (reel.instagramUrl && (reel.instagramUrl.includes('youtube.com') || reel.instagramUrl.includes('youtu.be'))) ||
-    reel.shortcode?.length === 11;
+  const isYouTube = Boolean(
+    reel.instagramUrl && (reel.instagramUrl.includes('youtube.com') || reel.instagramUrl.includes('youtu.be'))
+  );
 
   const embedUrl = isYouTube
     ? `https://www.youtube.com/embed/${reel.shortcode}?autoplay=1&rel=0`
-    : `https://www.instagram.com/reel/${reel.shortcode}/embed/`;
+    : `https://www.instagram.com/reel/${reel.shortcode}/embed/captioned/`;
 
   const platformName = isYouTube ? 'YouTube Short' : 'Instagram Reel';
 
@@ -98,14 +98,16 @@ export default function FloatingPlayerModal({ reel, onClose }) {
                 </div>
               </div>
 
-              {/* Author and Shortcode */}
+              {/* Author and Collection */}
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-200">
                   @{reel.authorName || 'creator'}
                 </span>
-                <span className="font-mono text-slate-500 text-[11px]">
-                  #{reel.shortcode}
-                </span>
+                {reel.collectionName && (
+                  <span className="text-[11px] text-violet-400 font-medium">
+                    {reel.collectionName}
+                  </span>
+                )}
               </div>
 
               {/* Caption */}

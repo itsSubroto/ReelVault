@@ -3,6 +3,7 @@ package com.reelvault.service;
 import com.reelvault.dto.CollectionRequest;
 import com.reelvault.dto.CollectionResponse;
 import com.reelvault.entity.Collection;
+import com.reelvault.exception.BadRequestException;
 import com.reelvault.exception.ResourceNotFoundException;
 import com.reelvault.repository.CollectionRepository;
 import com.reelvault.repository.ReelRepository;
@@ -36,8 +37,13 @@ public class CollectionService {
 
     @Transactional
     public CollectionResponse createCollection(CollectionRequest request) {
+        String trimmedName = request.name().trim();
+        if (collectionRepository.existsByNameIgnoreCase(trimmedName)) {
+            throw new BadRequestException("A collection with the name '" + trimmedName + "' already exists");
+        }
+
         Collection collection = Collection.builder()
-                .name(request.name().trim())
+                .name(trimmedName)
                 .description(request.description() != null ? request.description().trim() : null)
                 .build();
 

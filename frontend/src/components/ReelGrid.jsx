@@ -13,7 +13,7 @@ export default function ReelGrid({
 }) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
         {[1, 2, 3, 4, 5, 6].map((n) => (
           <div
             key={n}
@@ -69,7 +69,7 @@ export default function ReelGrid({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
       {reels.map((reel) => (
         <ReelCard
           key={reel.id}

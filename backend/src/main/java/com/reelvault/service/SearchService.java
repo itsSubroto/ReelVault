@@ -31,6 +31,25 @@ public class SearchService {
             results = reelRepository.searchByCaption(trimmedQuery);
         }
 
+        String[] tokens = trimmedQuery.split("\\s+");
+        if (tokens.length > 1) {
+            java.util.LinkedHashMap<UUID, Reel> map = new java.util.LinkedHashMap<>();
+            for (Reel r : results) {
+                map.put(r.getId(), r);
+            }
+            for (String token : tokens) {
+                if (token.length() >= 2) {
+                    List<Reel> tokenResults = (collectionId != null)
+                            ? reelRepository.searchByCollectionAndCaption(collectionId, token)
+                            : reelRepository.searchByCaption(token);
+                    for (Reel tr : tokenResults) {
+                        map.putIfAbsent(tr.getId(), tr);
+                    }
+                }
+            }
+            results = new java.util.ArrayList<>(map.values());
+        }
+
         return results.stream().map(reelService::toResponse).toList();
     }
 }

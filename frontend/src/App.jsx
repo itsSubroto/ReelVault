@@ -20,6 +20,31 @@ export default function App() {
   const [activePlayingReel, setActivePlayingReel] = useState(null);
   const [pollingUntil, setPollingUntil] = useState(0);
   const [errorBanner, setErrorBanner] = useState(null);
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('reelvault-theme') || 'dark';
+  });
+
+  // Sync theme with html root class
+  useEffect(() => {
+    localStorage.setItem('reelvault-theme', theme);
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    }
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  const handleGoHome = () => {
+    setSelectedCollectionId(null);
+    setSearchQuery('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Fetch collections
   const loadCollections = useCallback(async () => {
@@ -136,6 +161,7 @@ export default function App() {
     const newCol = await api.createCollection(name, description);
     await loadCollections();
     setSelectedCollectionId(newCol.id);
+    return newCol;
   };
 
   // Handle Delete Collection
@@ -157,7 +183,7 @@ export default function App() {
   const selectedCollection = collections.find((c) => c.id === selectedCollectionId);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0b0f19] text-slate-100 selection:bg-violet-500/30">
+    <div className="min-h-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-violet-500/30 transition-colors duration-200">
       {/* Header / Navbar */}
       <Navbar
         searchQuery={searchQuery}
@@ -166,10 +192,13 @@ export default function App() {
         onOpenCreateCollectionModal={() => setIsCreateCollectionModalOpen(true)}
         onSyncAll={handleSyncAll}
         isSyncing={isSyncing}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+        onGoHome={handleGoHome}
       />
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto px-3 sm:px-4 md:px-6 py-6 flex flex-col md:flex-row gap-6">
         {/* Left Sidebar */}
         <Sidebar
           collections={collections}
@@ -208,10 +237,12 @@ export default function App() {
               </p>
             </div>
 
-            {/* Quick stats / tips */}
-            <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-900/40 px-3 py-1.5 rounded-xl border border-slate-800">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>AI Search: Caption + Transcript + Summary + Tags</span>
+            {/* Informational search capability badge (informative text, not button-like) */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 py-1">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="font-medium text-[11px] tracking-wide text-slate-400">
+                AI Search indexed across Caption • Transcript • Summary • Tags
+              </span>
             </div>
           </div>
 
@@ -243,12 +274,14 @@ export default function App() {
         collections={collections}
         defaultCollectionId={selectedCollectionId}
         onSave={handleSaveReel}
+        onCreateCollection={handleCreateCollection}
       />
 
       <CreateCollectionModal
         isOpen={isCreateCollectionModalOpen}
         onClose={() => setIsCreateCollectionModalOpen(false)}
         onCreate={handleCreateCollection}
+        existingCollections={collections}
       />
     </div>
   );

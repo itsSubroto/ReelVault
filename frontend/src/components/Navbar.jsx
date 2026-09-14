@@ -1,5 +1,5 @@
 import React from 'react';
-import { Film, Search, Plus, X, FolderPlus, RefreshCw } from 'lucide-react';
+import { Film, Search, Plus, X, FolderPlus, RefreshCw, Sun, Moon } from 'lucide-react';
 
 export default function Navbar({
   searchQuery,
@@ -8,6 +8,9 @@ export default function Navbar({
   onOpenCreateCollectionModal,
   onSyncAll,
   isSyncing,
+  theme,
+  onToggleTheme,
+  onGoHome,
 }) {
   const searchInputRef = React.useRef(null);
 
@@ -29,14 +32,18 @@ export default function Navbar({
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-4 md:px-6 h-16 flex items-center justify-between gap-3 sm:gap-4">
         {/* Brand */}
-        <div className="flex items-center gap-3 shrink-0 cursor-pointer">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-pink-600 to-amber-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
+        <div
+          onClick={onGoHome}
+          className="flex items-center gap-3 shrink-0 cursor-pointer group select-none"
+          title="Go to ReelVault Home"
+        >
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 via-pink-600 to-amber-500 flex items-center justify-center shadow-lg shadow-violet-500/20 group-hover:scale-105 transition-transform">
             <Film className="w-5 h-5 text-white" />
           </div>
           <div className="hidden sm:block">
-            <span className="font-bold text-lg bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            <span className="font-bold text-lg bg-gradient-to-r from-white via-slate-200 to-slate-400 group-hover:from-violet-200 group-hover:to-pink-300 bg-clip-text text-transparent transition-all">
               ReelVault
             </span>
             <span className="text-[10px] block font-mono text-violet-400 -mt-1 tracking-wider uppercase">
@@ -97,6 +104,20 @@ export default function Navbar({
           >
             <FolderPlus className="w-3.5 h-3.5" />
             <span>New Collection</span>
+          </button>
+
+          {/* Theme Toggle */}
+          <button
+            onClick={onToggleTheme}
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/80 border border-slate-700/60 transition-colors cursor-pointer"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-indigo-400" />
+            )}
           </button>
 
           <button

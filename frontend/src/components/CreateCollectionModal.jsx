@@ -5,6 +5,7 @@ export default function CreateCollectionModal({
   isOpen,
   onClose,
   onCreate,
+  existingCollections = [],
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -15,8 +16,19 @@ export default function CreateCollectionModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim()) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
       setError('Collection name is required');
+      return;
+    }
+
+    if (
+      existingCollections &&
+      existingCollections.some(
+        (c) => c.name.toLowerCase() === trimmedName.toLowerCase()
+      )
+    ) {
+      setError(`A collection named "${trimmedName}" already exists. Collection names must be unique.`);
       return;
     }
 

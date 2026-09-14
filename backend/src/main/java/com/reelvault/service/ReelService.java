@@ -7,6 +7,7 @@ import com.reelvault.dto.ReelUpdateRequest;
 import com.reelvault.entity.Collection;
 import com.reelvault.entity.Reel;
 import com.reelvault.entity.ReelStatus;
+import com.reelvault.exception.BadRequestException;
 import com.reelvault.exception.ResourceNotFoundException;
 import com.reelvault.repository.ReelRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -49,11 +51,44 @@ public class ReelService {
     public ReelResponse saveReel(ReelRequest request) {
         Collection collection = collectionService.findEntityById(request.collectionId());
 
-        InstagramService.InstagramMetadata metadata = instagramService.fetchMetadata(request.url());
+        String cleanUrl = request.url().trim();
+        String shortcode = instagramService.extractShortcode(cleanUrl);
 
-        Reel reel = Reel.builder()
+        // Prevent duplicate reel in the same collection
+        if (reelRepository.existsByCollectionIdAndShortcode(collection.getId(), shortcode)) {
+            throw new BadRequestException("This reel is already saved in this particular collection");
+        }
+
+        // Check if this reel was already enriched in another collection
+        Optional<Reel> existingReel = reelRepository.findFirstByShortcode(shortcode);
+
+        Reel reel;
+        if (existingReel.isPresent() && existingReel.get().getStatus() == ReelStatus.DONE) {
+            Reel existing = existingReel.get();
+            log.info("Reel shortcode {} already processed in collection '{}', copying metadata to '{}'",
+                    shortcode, existing.getCollection().getName(), collection.getName());
+            reel = Reel.builder()
+                    .collection(collection)
+                    .instagramUrl(cleanUrl)
+                    .shortcode(shortcode)
+                    .caption(existing.getCaption())
+                    .thumbnailUrl(existing.getThumbnailUrl())
+                    .authorName(existing.getAuthorName())
+                    .transcript(existing.getTranscript())
+                    .summary(existing.getSummary())
+                    .tags(existing.getTags() != null ? new ArrayList<>(existing.getTags()) : new ArrayList<>())
+                    .status(ReelStatus.DONE)
+                    .build();
+
+            Reel saved = reelRepository.save(reel);
+            return toResponse(saved);
+        }
+
+        InstagramService.InstagramMetadata metadata = instagramService.fetchMetadata(cleanUrl);
+
+        reel = Reel.builder()
                 .collection(collection)
-                .instagramUrl(request.url().trim())
+                .instagramUrl(cleanUrl)
                 .shortcode(metadata.shortcode())
                 .caption(metadata.caption())
                 .thumbnailUrl(metadata.thumbnailUrl())
