@@ -3,10 +3,12 @@ package com.reelvault.service;
 import com.reelvault.dto.CollectionRequest;
 import com.reelvault.dto.CollectionResponse;
 import com.reelvault.entity.Collection;
+import com.reelvault.entity.User;
 import com.reelvault.exception.BadRequestException;
 import com.reelvault.exception.ResourceNotFoundException;
 import com.reelvault.repository.CollectionRepository;
 import com.reelvault.repository.ReelRepository;
+import com.reelvault.security.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +25,12 @@ public class CollectionService {
 
     @Transactional(readOnly = true)
     public List<CollectionResponse> getAllCollections() {
-        return collectionRepository.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        User user = UserContext.getCurrentUser();
+        List<Collection> collections = (user != null)
+                ? collectionRepository.findByUserIdOrderByCreatedAtDesc(user.getId())
+                : collectionRepository.findAllByOrderByCreatedAtDesc();
+
+        return collections.stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -37,14 +41,21 @@ public class CollectionService {
 
     @Transactional
     public CollectionResponse createCollection(CollectionRequest request) {
+        User user = UserContext.getCurrentUser();
         String trimmedName = request.name().trim();
-        if (collectionRepository.existsByNameIgnoreCase(trimmedName)) {
+
+        boolean exists = (user != null)
+                ? collectionRepository.existsByUserIdAndNameIgnoreCase(user.getId(), trimmedName)
+                : collectionRepository.existsByNameIgnoreCase(trimmedName);
+
+        if (exists) {
             throw new BadRequestException("A collection with the name '" + trimmedName + "' already exists");
         }
 
         Collection collection = Collection.builder()
                 .name(trimmedName)
                 .description(request.description() != null ? request.description().trim() : null)
+                .user(user)
                 .build();
 
         Collection saved = collectionRepository.save(collection);

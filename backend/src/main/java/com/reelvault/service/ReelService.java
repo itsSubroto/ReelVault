@@ -108,11 +108,20 @@ public class ReelService {
 
     @Transactional(readOnly = true)
     public List<ReelResponse> getReels(UUID collectionId) {
+        com.reelvault.entity.User user = com.reelvault.security.UserContext.getCurrentUser();
         List<Reel> reels;
-        if (collectionId != null) {
-            reels = reelRepository.findByCollectionIdOrderByCreatedAtDesc(collectionId);
+        if (user != null) {
+            if (collectionId != null) {
+                reels = reelRepository.findByCollectionIdAndCollectionUserIdOrderByCreatedAtDesc(collectionId, user.getId());
+            } else {
+                reels = reelRepository.findByCollectionUserIdOrderByCreatedAtDesc(user.getId());
+            }
         } else {
-            reels = reelRepository.findAllByOrderByCreatedAtDesc();
+            if (collectionId != null) {
+                reels = reelRepository.findByCollectionIdOrderByCreatedAtDesc(collectionId);
+            } else {
+                reels = reelRepository.findAllByOrderByCreatedAtDesc();
+            }
         }
         return reels.stream().map(this::toResponse).toList();
     }

@@ -23,12 +23,22 @@ public class SearchService {
             return reelService.getReels(collectionId);
         }
 
+        com.reelvault.entity.User user = com.reelvault.security.UserContext.getCurrentUser();
         String trimmedQuery = query.trim();
         List<Reel> results;
-        if (collectionId != null) {
-            results = reelRepository.searchByCollectionAndCaption(collectionId, trimmedQuery);
+
+        if (user != null) {
+            if (collectionId != null) {
+                results = reelRepository.searchByUserAndCollectionAndCaption(user.getId(), collectionId, trimmedQuery);
+            } else {
+                results = reelRepository.searchByUserAndCaption(user.getId(), trimmedQuery);
+            }
         } else {
-            results = reelRepository.searchByCaption(trimmedQuery);
+            if (collectionId != null) {
+                results = reelRepository.searchByCollectionAndCaption(collectionId, trimmedQuery);
+            } else {
+                results = reelRepository.searchByCaption(trimmedQuery);
+            }
         }
 
         String[] tokens = trimmedQuery.split("\\s+");
@@ -39,9 +49,16 @@ public class SearchService {
             }
             for (String token : tokens) {
                 if (token.length() >= 2) {
-                    List<Reel> tokenResults = (collectionId != null)
-                            ? reelRepository.searchByCollectionAndCaption(collectionId, token)
-                            : reelRepository.searchByCaption(token);
+                    List<Reel> tokenResults;
+                    if (user != null) {
+                        tokenResults = (collectionId != null)
+                                ? reelRepository.searchByUserAndCollectionAndCaption(user.getId(), collectionId, token)
+                                : reelRepository.searchByUserAndCaption(user.getId(), token);
+                    } else {
+                        tokenResults = (collectionId != null)
+                                ? reelRepository.searchByCollectionAndCaption(collectionId, token)
+                                : reelRepository.searchByCaption(token);
+                    }
                     for (Reel tr : tokenResults) {
                         map.putIfAbsent(tr.getId(), tr);
                     }

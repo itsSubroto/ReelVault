@@ -5,10 +5,14 @@ import ReelGrid from './components/ReelGrid';
 import SaveReelModal from './components/SaveReelModal';
 import CreateCollectionModal from './components/CreateCollectionModal';
 import FloatingPlayerModal from './components/FloatingPlayerModal';
+import AuthModal from './components/AuthModal';
 import { api } from './api/client';
 import { Sparkles, AlertCircle } from 'lucide-react';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login');
   const [collections, setCollections] = useState([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
   const [reels, setReels] = useState([]);
@@ -36,6 +40,57 @@ export default function App() {
     }
   }, [theme]);
 
+  // Check auth session on startup
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const user = await api.getMe();
+        if (user) {
+          setCurrentUser(user);
+        }
+      } catch {
+        setCurrentUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initAuth();
+  }, []);
+
+  const handleOpenAuthModal = (mode = 'login') => {
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
+  };
+
+  const handleAuthSuccess = (user) => {
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+  };
+
+  const handleLogout = () => {
+    api.logout();
+    setCurrentUser(null);
+    setCollections([]);
+    setReels([]);
+    setSelectedCollectionId(null);
+  };
+
+  const handleOpenSaveModal = () => {
+    if (!currentUser) {
+      handleOpenAuthModal('login');
+      return;
+    }
+    setIsSaveModalOpen(true);
+  };
+
+  const handleOpenCreateCollectionModal = () => {
+    if (!currentUser) {
+      handleOpenAuthModal('login');
+      return;
+    }
+    setIsCreateCollectionModalOpen(true);
+  };
+
   const handleToggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
@@ -50,9 +105,10 @@ export default function App() {
   const loadCollections = useCallback(async () => {
     try {
       const data = await api.getCollections();
-      setCollections(data);
+      setCollections(data || []);
     } catch (err) {
       console.error('Failed to load collections:', err);
+      setCollections([]);
     }
   }, []);
 
@@ -62,35 +118,47 @@ export default function App() {
     try {
       if (searchQuery.trim()) {
         const results = await api.search(searchQuery.trim(), selectedCollectionId);
-        setReels(results);
+        setReels(results || []);
       } else {
         const data = await api.getReels(selectedCollectionId);
-        setReels(data);
+        setReels(data || []);
       }
       setErrorBanner(null);
     } catch (err) {
       console.error('Failed to fetch reels:', err);
-      setErrorBanner('Could not load reels. Please ensure the backend is running.');
+      if (currentUser) {
+        setErrorBanner('Could not load reels. Please ensure the backend is running.');
+      }
+      setReels([]);
     } finally {
       if (showLoadingState) setIsLoading(false);
     }
-  }, [searchQuery, selectedCollectionId]);
+  }, [searchQuery, selectedCollectionId, currentUser]);
 
-  // Initial load
+  // Load when user logs in or state changes
   useEffect(() => {
-    loadCollections();
-  }, [loadCollections]);
+    if (currentUser) {
+      loadCollections();
+      loadReels();
+    } else {
+      setCollections([]);
+      setReels([]);
+      setSelectedCollectionId(null);
+    }
+  }, [currentUser, loadCollections, loadReels]);
 
   // Search debounce and collection change handler
   useEffect(() => {
+    if (!currentUser) return;
     const timer = setTimeout(() => {
       loadReels();
     }, 250);
     return () => clearTimeout(timer);
-  }, [loadReels]);
+  }, [loadReels, currentUser]);
 
   // Auto-poll when any reel is currently PROCESSING or during the post-save polling window
   useEffect(() => {
+    if (!currentUser) return;
     const hasProcessing = reels.some((r) => r.status === 'PROCESSING');
     const isWindowActive = Date.now() < pollingUntil;
 
@@ -101,7 +169,7 @@ export default function App() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [reels, pollingUntil, loadReels]);
+  }, [reels, pollingUntil, loadReels, currentUser]);
 
   // Handle Reel Save
   const handleSaveReel = async (url, collectionId) => {
@@ -188,13 +256,16 @@ export default function App() {
       <Navbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onOpenSaveModal={() => setIsSaveModalOpen(true)}
-        onOpenCreateCollectionModal={() => setIsCreateCollectionModalOpen(true)}
+        onOpenSaveModal={handleOpenSaveModal}
+        onOpenCreateCollectionModal={handleOpenCreateCollectionModal}
         onSyncAll={handleSyncAll}
         isSyncing={isSyncing}
         theme={theme}
         onToggleTheme={handleToggleTheme}
         onGoHome={handleGoHome}
+        currentUser={currentUser}
+        onOpenAuthModal={handleOpenAuthModal}
+        onLogout={handleLogout}
       />
 
       {/* Main Container */}
@@ -204,13 +275,40 @@ export default function App() {
           collections={collections}
           selectedCollectionId={selectedCollectionId}
           onSelectCollection={setSelectedCollectionId}
-          onOpenCreateCollectionModal={() => setIsCreateCollectionModalOpen(true)}
+          onOpenCreateCollectionModal={handleOpenCreateCollectionModal}
           onDeleteCollection={handleDeleteCollection}
           totalReelsCount={totalReelsCount}
         />
 
         {/* Content Area */}
         <section className="flex-1 min-w-0 space-y-6">
+          {/* Sign In Prompt for unauthenticated visitors */}
+          {!currentUser && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-violet-950/40 via-purple-950/40 to-pink-950/40 border border-violet-800/40 text-xs sm:text-sm text-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-2.5">
+                <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-semibold block text-white">Sign in to save and organize your reels</span>
+                  <span className="text-xs text-slate-400">Create collections, save Instagram reels & YouTube shorts, and search transcripts with AI.</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleOpenAuthModal('login')}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-violet-600 hover:bg-violet-500 shadow transition-all cursor-pointer"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => handleOpenAuthModal('register')}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all cursor-pointer"
+                >
+                  Register
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Status banner */}
           {errorBanner && (
             <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-xs sm:text-sm text-red-300 flex items-center gap-3">
@@ -253,7 +351,7 @@ export default function App() {
             searchQuery={searchQuery}
             onDeleteReel={handleDeleteReel}
             onProcessReel={handleProcessReel}
-            onOpenSaveModal={() => setIsSaveModalOpen(true)}
+            onOpenSaveModal={handleOpenSaveModal}
             onPlayReel={(reel) => setActivePlayingReel(reel)}
           />
         </section>
@@ -282,6 +380,14 @@ export default function App() {
         onClose={() => setIsCreateCollectionModalOpen(false)}
         onCreate={handleCreateCollection}
         existingCollections={collections}
+      />
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+        initialMode={authModalMode}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Film, Search, Plus, X, FolderPlus, RefreshCw, Sun, Moon } from 'lucide-react';
+import { Film, Search, Plus, X, FolderPlus, RefreshCw, Sun, Moon, LogIn, LogOut, User as UserIcon } from 'lucide-react';
 
 export default function Navbar({
   searchQuery,
@@ -11,6 +11,9 @@ export default function Navbar({
   theme,
   onToggleTheme,
   onGoHome,
+  currentUser,
+  onOpenAuthModal,
+  onLogout,
 }) {
   const searchInputRef = React.useRef(null);
 
@@ -122,11 +125,44 @@ export default function Navbar({
 
           <button
             onClick={onOpenSaveModal}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 rounded-xl shadow-md shadow-violet-600/25 active:scale-[0.98] transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 rounded-xl shadow-md shadow-violet-600/25 active:scale-[0.98] transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Save Reel</span>
           </button>
+
+          {/* User Profile / Auth Button */}
+          {currentUser ? (
+            <div className="flex items-center gap-1.5 pl-1.5 border-l border-slate-800">
+              <div
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-800/70 border border-slate-700/60 text-xs text-slate-200"
+                title={`Signed in as @${currentUser.username} (${currentUser.email})`}
+              >
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-violet-600 to-pink-600 text-white font-bold flex items-center justify-center text-[11px] shrink-0">
+                  {(currentUser.name || currentUser.username)[0].toUpperCase()}
+                </div>
+                <span className="font-semibold hidden lg:inline truncate max-w-[90px]">
+                  {currentUser.name || currentUser.username}
+                </span>
+              </div>
+              <button
+                onClick={onLogout}
+                className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-slate-700/60 transition-colors cursor-pointer"
+                title="Log Out"
+                aria-label="Log Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onOpenAuthModal && onOpenAuthModal('login')}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5 text-violet-400" />
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
       </div>
     </header>
