@@ -77,6 +77,10 @@ Open a terminal in `ai-service/`:
 ```bash
 cd ai-service
 uvicorn main:app --port 8000 --reload
+
+or 
+
+python -m uvicorn main:app --port 8000 --reload   
 ```
 The FastAPI service will be live at `http://localhost:8000` (Swagger docs at `http://localhost:8000/docs`).
 

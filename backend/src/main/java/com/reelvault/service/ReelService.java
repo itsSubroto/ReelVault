@@ -185,7 +185,7 @@ public class ReelService {
             HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    "http://localhost:8000/api/reprocess-all/",
+                    "http://ai-service:8000/api/reprocess-all/",
                     entity,
                     Map.class
             );
@@ -212,7 +212,7 @@ public class ReelService {
                 headers.setContentLength(jsonBody.getBytes(StandardCharsets.UTF_8).length);
                 HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
-                restTemplate.postForEntity("http://localhost:8000/api/process-reel/", entity, String.class);
+                restTemplate.postForEntity("http://ai-service:8000/api/process-reel/", entity, String.class);
                 log.info("Successfully triggered AI service for reel: {}", reelId);
             } catch (Exception e) {
                 log.warn("Python AI service notification error for reel {}: {}", reelId, e.getMessage());
