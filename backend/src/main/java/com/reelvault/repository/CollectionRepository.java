@@ -11,5 +11,9 @@ import java.util.UUID;
 public interface CollectionRepository extends JpaRepository<Collection, UUID> {
     List<Collection> findAllByOrderByCreatedAtDesc();
 
+    List<Collection> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
     boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByUserIdAndNameIgnoreCase(UUID userId, String name);
 }

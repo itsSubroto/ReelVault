@@ -23,5 +23,7 @@ spring:
             non_contextual_creation: true
 
 reelvault:
+  jwt:
+    secret: ${JWT_SECRET:reelvault-secure-jwt-secret-key-32-chars-minimum!}
   instagram:
     access-token: ${INSTAGRAM_ACCESS_TOKEN:}
