@@ -49,7 +49,13 @@ public class ReelService {
 
     @Transactional
     public ReelResponse saveReel(ReelRequest request) {
-        Collection collection = collectionService.findEntityById(request.collectionId());
+        com.reelvault.entity.User user = com.reelvault.security.UserContext.getCurrentUser();
+        Collection collection;
+        if (request.collectionId() != null) {
+            collection = collectionService.findEntityById(request.collectionId());
+        } else {
+            collection = collectionService.getOrCreateDefaultCollection(user);
+        }
 
         String cleanUrl = request.url().trim();
         String shortcode = instagramService.extractShortcode(cleanUrl);
@@ -218,6 +224,36 @@ public class ReelService {
                 log.warn("Python AI service notification error for reel {}: {}", reelId, e.getMessage());
             }
         });
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> checkReelStatus(String url) {
+        if (url == null || url.isBlank()) {
+            return Map.of("saved", false);
+        }
+        try {
+            String shortcode = instagramService.extractShortcode(url);
+            com.reelvault.entity.User user = com.reelvault.security.UserContext.getCurrentUser();
+            Optional<Reel> reelOpt;
+            if (user != null) {
+                reelOpt = reelRepository.findFirstByShortcodeAndCollectionUserId(shortcode, user.getId());
+                if (reelOpt.isEmpty()) {
+                    reelOpt = reelRepository.findFirstByShortcode(shortcode);
+                }
+            } else {
+                reelOpt = reelRepository.findFirstByShortcode(shortcode);
+            }
+            if (reelOpt.isPresent()) {
+                Reel reel = reelOpt.get();
+                return Map.of(
+                        "saved", true,
+                        "reel", toResponse(reel)
+                );
+            }
+        } catch (Exception e) {
+            log.debug("Check reel status failed for url {}: {}", url, e.getMessage());
+        }
+        return Map.of("saved", false);
     }
 
     public Reel findEntityById(UUID id) {

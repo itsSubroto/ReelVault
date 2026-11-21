@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReelVault Quick Save</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-box">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="20" rx="4" />
+            <path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">ReelVault</span>
+          <span class="brand-subtitle">Quick Save</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div id="status-badge" class="status-badge" title="Backend Server Status">
+          <span class="status-dot"></span>
+          <span id="status-text" class="status-label">Checking...</span>
+        </div>
+        <button id="btn-toggle-settings" class="icon-btn" title="Settings & Account">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Alert / Toast Banner -->
+    <div id="alert-banner" class="alert-banner hidden">
+      <span id="alert-message"></span>
+    </div>
+
+    <!-- Login View (Hidden when authenticated) -->
+    <section id="view-login" class="view hidden">
+      <div class="login-card">
+        <div class="login-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <polyline points="10 17 15 12 10 7" />
+            <line x1="15" y1="12" x2="3" y2="12" />
+          </svg>
+        </div>
+        <h2 class="view-title">Connect to ReelVault</h2>
+        <p class="view-desc">Sign in to save videos directly from your browser.</p>
+
+        <form id="form-login" class="form">
+          <div class="form-group">
+            <label for="login-username">Username or Email</label>
+            <input type="text" id="login-username" placeholder="e.g. tech_user" required />
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" placeholder="••••••••" required />
+          </div>
+          <div class="form-group">
+            <label for="login-api-url">Backend Server URL</label>
+            <input type="text" id="login-api-url" value="http://localhost:8080" />
+          </div>
+
+          <button type="submit" id="btn-login-submit" class="btn btn-primary btn-block">
+            Sign In to ReelVault
+          </button>
+        </form>
+
+        <div class="login-footer">
+          <span>Need an account?</span>
+          <a id="link-open-register" href="#">Open ReelVault App</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Quick Save View (Visible when authenticated) -->
+    <section id="view-main" class="view">
+      <!-- Active Video Card -->
+      <div class="video-card">
+        <div class="video-card-top">
+          <span id="platform-badge" class="platform-badge badge-youtube">
+            <span class="badge-dot"></span>
+            <span id="platform-name">YouTube</span>
+          </span>
+          <span id="save-status-badge" class="badge-saved hidden">✓ Already in Vault</span>
+        </div>
+
+        <div class="video-title-row">
+          <h3 id="video-title" class="video-title">Detecting current video...</h3>
+        </div>
+
+        <div class="video-url-row">
+          <input type="text" id="video-url-input" class="url-input" placeholder="https://www.youtube.com/... or https://www.instagram.com/reel/..." />
+        </div>
+      </div>
+
+      <!-- Collection Selection -->
+      <div class="collection-row">
+        <div class="collection-select-wrap">
+          <label for="select-collection" class="field-label">Save To Collection</label>
+          <div class="select-with-btn">
+            <select id="select-collection" class="select-input">
+              <option value="">⚡ Quick Save (Default)</option>
+            </select>
+            <button id="btn-new-collection" class="btn btn-secondary btn-sm" title="Create Collection">
+              + New
+            </button>
+          </div>
+        </div>
+
+        <!-- Inline New Collection Form (Hidden by default) -->
+        <div id="inline-create-col" class="inline-create hidden">
+          <input type="text" id="new-col-name" placeholder="Collection name..." class="url-input" />
+          <button id="btn-save-new-col" class="btn btn-primary btn-xs">Create</button>
+          <button id="btn-cancel-new-col" class="btn btn-ghost btn-xs">&times;</button>
+        </div>
+      </div>
+
+      <!-- Save Button -->
+      <button id="btn-save" class="btn btn-primary btn-large btn-block">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <span id="btn-save-label">Save to ReelVault</span>
+      </button>
+
+      <!-- Open App Link -->
+      <div class="quick-links">
+        <button id="btn-open-dashboard" class="link-btn">
+          Open ReelVault Dashboard &rarr;
+        </button>
+      </div>
+
+      <!-- Recent Saves -->
+      <div id="recent-saves-section" class="recent-section">
+        <div class="recent-header">
+          <span class="recent-title">Recent Quick Saves</span>
+        </div>
+        <div id="recent-saves-list" class="recent-list">
+          <div class="recent-empty">No recent saves yet</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings & Profile View (Toggled via header button) -->
+    <section id="view-settings" class="view hidden">
+      <div class="settings-card">
+        <div class="settings-header">
+          <h2 class="view-title">Settings & Account</h2>
+          <button id="btn-close-settings" class="icon-btn">&times;</button>
+        </div>
+
+        <div id="profile-info" class="profile-info">
+          <div class="avatar-circle">
+            <span id="avatar-initial">U</span>
+          </div>
+          <div class="profile-details">
+            <div id="profile-name" class="profile-name">User</div>
+            <div id="profile-username" class="profile-username">@username</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="settings-api-url">Spring Boot Backend URL</label>
+          <input type="text" id="settings-api-url" value="http://localhost:8080" />
+        </div>
+
+        <div class="form-group">
+          <label for="settings-web-url">React Web App URL</label>
+          <input type="text" id="settings-web-url" value="http://localhost:5173" />
+        </div>
+
+        <div class="settings-actions">
+          <button id="btn-save-settings" class="btn btn-secondary btn-block">
+            Save Settings
+          </button>
+          <button id="btn-logout" class="btn btn-danger btn-block">
+            Sign Out
+          </button>
+        </div>
+
+        <div class="version-info">
+          <span>ReelVault Extension v1.0.0</span>
+          <span>Manifest V3</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

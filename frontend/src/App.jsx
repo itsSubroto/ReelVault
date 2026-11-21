@@ -6,6 +6,7 @@ import SaveReelModal from './components/SaveReelModal';
 import CreateCollectionModal from './components/CreateCollectionModal';
 import FloatingPlayerModal from './components/FloatingPlayerModal';
 import AuthModal from './components/AuthModal';
+import ExtensionModal from './components/ExtensionModal';
 import { api } from './api/client';
 import { Sparkles, AlertCircle } from 'lucide-react';
 
@@ -21,6 +22,7 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isCreateCollectionModalOpen, setIsCreateCollectionModalOpen] = useState(false);
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
   const [activePlayingReel, setActivePlayingReel] = useState(null);
   const [pollingUntil, setPollingUntil] = useState(0);
   const [errorBanner, setErrorBanner] = useState(null);
@@ -258,6 +260,7 @@ export default function App() {
         onSearchChange={setSearchQuery}
         onOpenSaveModal={handleOpenSaveModal}
         onOpenCreateCollectionModal={handleOpenCreateCollectionModal}
+        onOpenExtensionModal={() => setIsExtensionModalOpen(true)}
         onSyncAll={handleSyncAll}
         isSyncing={isSyncing}
         theme={theme}
@@ -388,6 +391,13 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={handleAuthSuccess}
         initialMode={authModalMode}
+      />
+
+      {/* Browser Extension Modal */}
+      <ExtensionModal
+        isOpen={isExtensionModalOpen}
+        onClose={() => setIsExtensionModalOpen(false)}
+        currentUser={currentUser}
       />
     </div>
   );

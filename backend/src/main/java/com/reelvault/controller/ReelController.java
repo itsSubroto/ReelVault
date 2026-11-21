@@ -31,6 +31,11 @@ public class ReelController {
         return ResponseEntity.ok(reelService.getReels(collectionId));
     }
 
+    @GetMapping("/check")
+    public ResponseEntity<java.util.Map<String, Object>> checkReel(@RequestParam String url) {
+        return ResponseEntity.ok(reelService.checkReelStatus(url));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ReelResponse> getReelById(@PathVariable UUID id) {
         return ResponseEntity.ok(reelService.getReelById(id));

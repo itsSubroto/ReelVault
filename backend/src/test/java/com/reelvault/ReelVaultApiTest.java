@@ -38,10 +38,28 @@ public class ReelVaultApiTest {
     @Autowired
     private CollectionRepository collectionRepository;
 
+    @Autowired
+    private com.reelvault.repository.UserRepository userRepository;
+
+    @Autowired
+    private com.reelvault.security.JwtService jwtService;
+
+    private String authToken;
+    private com.reelvault.entity.User testUser;
+
     @BeforeEach
     void setUp() {
         reelRepository.deleteAll();
         collectionRepository.deleteAll();
+        userRepository.deleteAll();
+
+        testUser = userRepository.save(com.reelvault.entity.User.builder()
+                .username("testuser")
+                .email("test@example.com")
+                .password("encoded_pass")
+                .name("Test User")
+                .build());
+        authToken = jwtService.generateToken(testUser);
     }
 
     @Test
@@ -49,6 +67,7 @@ public class ReelVaultApiTest {
         CollectionRequest request = new CollectionRequest("Tech Tips", "Cool tech tricks");
 
         MvcResult createResult = mockMvc.perform(post("/api/collections")
+                        .header("Authorization", "Bearer " + authToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -61,12 +80,14 @@ public class ReelVaultApiTest {
         CollectionResponse createdCollection = objectMapper.readValue(
                 createResult.getResponse().getContentAsString(), CollectionResponse.class);
 
-        mockMvc.perform(get("/api/collections"))
+        mockMvc.perform(get("/api/collections")
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].name").value("Tech Tips"));
 
-        mockMvc.perform(get("/api/collections/" + createdCollection.id()))
+        mockMvc.perform(get("/api/collections/" + createdCollection.id())
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(createdCollection.id().toString()));
     }
@@ -76,6 +97,7 @@ public class ReelVaultApiTest {
         // 1. Create collection
         CollectionRequest colReq = new CollectionRequest("Workouts", "Fitness reels");
         MvcResult colResult = mockMvc.perform(post("/api/collections")
+                        .header("Authorization", "Bearer " + authToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(colReq)))
                 .andExpect(status().isCreated())
@@ -91,6 +113,7 @@ public class ReelVaultApiTest {
         );
 
         MvcResult reelResult = mockMvc.perform(post("/api/reels")
+                        .header("Authorization", "Bearer " + authToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reelReq)))
                 .andExpect(status().isCreated())
@@ -104,18 +127,21 @@ public class ReelVaultApiTest {
                 reelResult.getResponse().getContentAsString(), ReelResponse.class);
 
         // 3. Verify collection now reports reelCount = 1
-        mockMvc.perform(get("/api/collections"))
+        mockMvc.perform(get("/api/collections")
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].reelCount").value(1));
 
         // 4. List reels by collection
-        mockMvc.perform(get("/api/reels?collectionId=" + collection.id()))
+        mockMvc.perform(get("/api/reels?collectionId=" + collection.id())
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value(savedReel.id().toString()));
 
         // 5. Get single reel
-        mockMvc.perform(get("/api/reels/" + savedReel.id()))
+        mockMvc.perform(get("/api/reels/" + savedReel.id())
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(savedReel.id().toString()));
     }
@@ -125,6 +151,7 @@ public class ReelVaultApiTest {
         // Create collection
         CollectionRequest colReq = new CollectionRequest("Coding", "Software development");
         MvcResult colResult = mockMvc.perform(post("/api/collections")
+                        .header("Authorization", "Bearer " + authToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(colReq)))
                 .andExpect(status().isCreated())
@@ -135,13 +162,14 @@ public class ReelVaultApiTest {
         // Save reel
         ReelRequest reelReq = new ReelRequest("https://www.instagram.com/reel/C9test999/", collection.id());
         MvcResult reelResult = mockMvc.perform(post("/api/reels")
+                        .header("Authorization", "Bearer " + authToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reelReq)))
                 .andExpect(status().isCreated())
                 .andReturn();
         ReelResponse reel = objectMapper.readValue(reelResult.getResponse().getContentAsString(), ReelResponse.class);
 
-        // Update caption with specific searchable keywords
+        // Update caption with specific searchable keywords (PATCH callback is public or authenticated)
         mockMvc.perform(patch("/api/reels/" + reel.id())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"caption\": \"Mastering docker containers and kubernetes tips\"}"))
@@ -149,13 +177,15 @@ public class ReelVaultApiTest {
                 .andExpect(jsonPath("$.caption").value("Mastering docker containers and kubernetes tips"));
 
         // Search for "docker"
-        mockMvc.perform(get("/api/search?q=docker"))
+        mockMvc.perform(get("/api/search?q=docker")
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value(reel.id().toString()));
 
         // Search for "unrelated" should return empty
-        mockMvc.perform(get("/api/search?q=unrelatedterm"))
+        mockMvc.perform(get("/api/search?q=unrelatedterm")
+                        .header("Authorization", "Bearer " + authToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
     }
@@ -164,6 +194,7 @@ public class ReelVaultApiTest {
     void shouldReturn400ForInvalidUrl() throws Exception {
         CollectionRequest colReq = new CollectionRequest("Misc", "Misc");
         MvcResult colResult = mockMvc.perform(post("/api/collections")
+                        .header("Authorization", "Bearer " + authToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(colReq)))
                 .andExpect(status().isCreated())
@@ -173,9 +204,46 @@ public class ReelVaultApiTest {
 
         ReelRequest invalidReq = new ReelRequest("https://example.com/not-an-instagram-reel", collection.id());
         mockMvc.perform(post("/api/reels")
+                        .header("Authorization", "Bearer " + authToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidReq)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(containsString("Invalid Instagram URL")));
+    }
+
+    @Test
+    void shouldQuickSaveReelWithDefaultCollection() throws Exception {
+        // Save reel without collectionId - should auto-create "Quick Save" collection
+        ReelRequest quickReq = new ReelRequest("https://www.youtube.com/shorts/dQw4w9WgXcQ", null);
+        MvcResult result = mockMvc.perform(post("/api/reels")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(quickReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andExpect(jsonPath("$.shortcode").value("dQw4w9WgXcQ"))
+                .andExpect(jsonPath("$.collectionName").value("Quick Save"))
+                .andReturn();
+
+        // Verify "Quick Save" collection is in collections list
+        mockMvc.perform(get("/api/collections")
+                        .header("Authorization", "Bearer " + authToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.name == 'Quick Save')]").exists());
+
+        // Verify check endpoint recognizes this video as saved
+        mockMvc.perform(get("/api/reels/check?url=https://www.youtube.com/shorts/dQw4w9WgXcQ")
+                        .header("Authorization", "Bearer " + authToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.saved").value(true))
+                .andExpect(jsonPath("$.reel.shortcode").value("dQw4w9WgXcQ"));
+    }
+
+    @Test
+    void shouldCheckHealthEndpoint() throws Exception {
+        mockMvc.perform(get("/api/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.service").value("ReelVault API"));
     }
 }

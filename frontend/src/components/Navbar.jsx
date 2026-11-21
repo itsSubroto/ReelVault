@@ -1,11 +1,12 @@
 import React from 'react';
-import { Film, Search, Plus, X, FolderPlus, RefreshCw, Sun, Moon, LogIn, LogOut, User as UserIcon } from 'lucide-react';
+import { Film, Search, Plus, X, FolderPlus, RefreshCw, Sun, Moon, LogIn, LogOut, User as UserIcon, Puzzle } from 'lucide-react';
 
 export default function Navbar({
   searchQuery,
   onSearchChange,
   onOpenSaveModal,
   onOpenCreateCollectionModal,
+  onOpenExtensionModal,
   onSyncAll,
   isSyncing,
   theme,
@@ -102,11 +103,21 @@ export default function Navbar({
 
           <button
             onClick={onOpenCreateCollectionModal}
-            className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors"
+            className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors cursor-pointer"
             title="New Collection"
           >
             <FolderPlus className="w-3.5 h-3.5" />
             <span>New Collection</span>
+          </button>
+
+          <button
+            onClick={onOpenExtensionModal}
+            className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-colors cursor-pointer"
+            title="Get Browser Extension (Quick Save)"
+          >
+            <Puzzle className="w-3.5 h-3.5 text-pink-400" />
+            <span className="hidden lg:inline">Browser Extension</span>
+            <span className="lg:hidden">Extension</span>
           </button>
 
           {/* Theme Toggle */}

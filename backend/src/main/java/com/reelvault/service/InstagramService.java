@@ -20,10 +20,10 @@ import java.util.regex.Pattern;
 public class InstagramService {
 
     private static final Pattern INSTAGRAM_PATTERN =
-            Pattern.compile("(?:instagram\\.com\\/(?:reel|reels|p)\\/)([a-zA-Z0-9_-]+)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("(?:instagram\\.com\\/(?:reel|reels|p|share\\/reel)\\/)([a-zA-Z0-9_-]+)", Pattern.CASE_INSENSITIVE);
 
     private static final Pattern YOUTUBE_PATTERN =
-            Pattern.compile("(?:youtube\\.com\\/shorts\\/|youtu\\.be\\/|youtube\\.com\\/watch\\?v=)([a-zA-Z0-9_-]+)", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("(?:(?:m\\.)?youtube\\.com\\/shorts\\/|youtu\\.be\\/|(?:m\\.)?youtube\\.com\\/watch\\?.*?v=)([a-zA-Z0-9_-]+)", Pattern.CASE_INSENSITIVE);
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -44,7 +44,7 @@ public class InstagramService {
     ) {}
 
     /**
-     * Extracts the shortcode from an Instagram Reel or YouTube Short URL.
+     * Extracts the shortcode from an Instagram Reel or YouTube Short/Video URL.
      */
     public String extractShortcode(String url) {
         if (url == null || url.isBlank()) {
@@ -62,7 +62,7 @@ public class InstagramService {
             return ytMatcher.group(1);
         }
 
-        throw new BadRequestException("Invalid Instagram URL or YouTube Short. Expected format: https://www.instagram.com/reel/<shortcode>/ or https://www.youtube.com/shorts/<id>");
+        throw new BadRequestException("Invalid Instagram URL or YouTube video. Expected format: https://www.instagram.com/reel/<shortcode>/ or https://www.youtube.com/watch?v=<id> or https://www.youtube.com/shorts/<id>");
     }
 
     public boolean isYouTube(String url) {
@@ -75,10 +75,11 @@ public class InstagramService {
     public InstagramMetadata fetchMetadata(String url) {
         String shortcode = extractShortcode(url);
         boolean isYt = isYouTube(url);
+        boolean isShort = url != null && url.contains("/shorts/");
         String cleanUrl = isYt
-                ? "https://www.youtube.com/shorts/" + shortcode
+                ? (isShort ? "https://www.youtube.com/shorts/" + shortcode : "https://www.youtube.com/watch?v=" + shortcode)
                 : "https://www.instagram.com/reel/" + shortcode + "/";
-        String fallbackPlatform = isYt ? "YouTube Short" : "Instagram Reel";
+        String fallbackPlatform = isYt ? (isShort ? "YouTube Short" : "YouTube Video") : "Instagram Reel";
         String fallbackCreator = isYt ? "YouTube Creator" : "Instagram Creator";
 
         // 1. Try Python AI metadata extractor (yt-dlp handles both Instagram and YouTube)

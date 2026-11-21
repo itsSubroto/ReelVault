@@ -73,6 +73,25 @@ public class CollectionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Collection not found with id: " + id));
     }
 
+    @Transactional
+    public Collection getOrCreateDefaultCollection(User user) {
+        String defaultName = "Quick Save";
+        if (user != null) {
+            return collectionRepository.findFirstByUserIdAndNameIgnoreCase(user.getId(), defaultName)
+                    .orElseGet(() -> collectionRepository.save(Collection.builder()
+                            .name(defaultName)
+                            .description("Default collection for browser extension & quick saves")
+                            .user(user)
+                            .build()));
+        } else {
+            return collectionRepository.findFirstByUserIdIsNullAndNameIgnoreCase(defaultName)
+                    .orElseGet(() -> collectionRepository.save(Collection.builder()
+                            .name(defaultName)
+                            .description("Default collection for browser extension & quick saves")
+                            .build()));
+        }
+    }
+
     private CollectionResponse toResponse(Collection collection) {
         long count = reelRepository.countByCollectionId(collection.getId());
         return new CollectionResponse(

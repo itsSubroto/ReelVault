@@ -27,6 +27,8 @@ public interface ReelRepository extends JpaRepository<Reel, UUID> {
 
     Optional<Reel> findFirstByShortcode(String shortcode);
 
+    Optional<Reel> findFirstByShortcodeAndCollectionUserId(String shortcode, UUID userId);
+
     @Query("SELECT DISTINCT r FROM Reel r LEFT JOIN r.tags t WHERE (" +
            "LOWER(COALESCE(r.caption, '')) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
            "LOWER(COALESCE(r.transcript, '')) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
