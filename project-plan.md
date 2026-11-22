@@ -80,6 +80,10 @@ Yeh ek **learning project** bhi hai — do log alag-alag stacks (Java/Spring Boo
 - [x] **Real-Time Web Dashboard Sync**:
   - Instant background refresh via `focus` and `visibilitychange` listeners when returning from extension saves.
   - Automatic active polling during AI enrichment and periodic sync while tab is active.
+- [x] **Multi-Collection Deduplication & In-Platform Playback**:
+  - Deduplicate reels across multiple collections by `shortcode` so each video appears only once in the "All Reels" home view and search results.
+  - Native in-platform HTML5 video player and sandboxed embed frame preventing third-party redirects to Instagram.
+  - Direct video streaming proxy endpoint (`/api/reels/{id}/stream`).
 - [ ] Better search ranking — move from basic keyword match to Postgres full-text ranking or embeddings-based semantic search
 - [ ] Rate-limiting / cost controls on the AI pipeline (Whisper + LLM calls)
 

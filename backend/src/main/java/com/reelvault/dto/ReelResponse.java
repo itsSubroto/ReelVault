@@ -14,6 +14,7 @@ public record ReelResponse(
     String shortcode,
     String caption,
     String thumbnailUrl,
+    String videoUrl,
     String authorName,
     ReelStatus status,
     String transcript,

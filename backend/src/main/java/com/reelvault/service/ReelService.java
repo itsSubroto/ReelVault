@@ -79,6 +79,7 @@ public class ReelService {
                     .shortcode(shortcode)
                     .caption(existing.getCaption())
                     .thumbnailUrl(existing.getThumbnailUrl())
+                    .videoUrl(existing.getVideoUrl())
                     .authorName(existing.getAuthorName())
                     .transcript(existing.getTranscript())
                     .summary(existing.getSummary())
@@ -98,6 +99,7 @@ public class ReelService {
                 .shortcode(metadata.shortcode())
                 .caption(metadata.caption())
                 .thumbnailUrl(metadata.thumbnailUrl())
+                .videoUrl(metadata.videoUrl())
                 .authorName(metadata.authorName())
                 .status(ReelStatus.SAVED)
                 .tags(new ArrayList<>())
@@ -129,7 +131,36 @@ public class ReelService {
                 reels = reelRepository.findAllByOrderByCreatedAtDesc();
             }
         }
+
+        // When viewing all reels across collections (collectionId == null), deduplicate by shortcode
+        // so that the same video saved across multiple collections appears only once on the home page.
+        if (collectionId == null) {
+            reels = deduplicateByShortcode(reels);
+        }
+
         return reels.stream().map(this::toResponse).toList();
+    }
+
+    public List<Reel> deduplicateByShortcode(List<Reel> reels) {
+        if (reels == null || reels.isEmpty()) {
+            return List.of();
+        }
+        java.util.Map<String, Reel> uniqueMap = new java.util.LinkedHashMap<>();
+        for (Reel reel : reels) {
+            String key = (reel.getShortcode() != null && !reel.getShortcode().isBlank())
+                    ? reel.getShortcode().trim()
+                    : (reel.getInstagramUrl() != null ? reel.getInstagramUrl().trim() : reel.getId().toString());
+
+            if (!uniqueMap.containsKey(key)) {
+                uniqueMap.put(key, reel);
+            } else {
+                Reel existing = uniqueMap.get(key);
+                if (existing.getStatus() != ReelStatus.DONE && reel.getStatus() == ReelStatus.DONE) {
+                    uniqueMap.put(key, reel);
+                }
+            }
+        }
+        return new ArrayList<>(uniqueMap.values());
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +185,9 @@ public class ReelService {
         }
         if (request.thumbnailUrl() != null) {
             reel.setThumbnailUrl(request.thumbnailUrl());
+        }
+        if (request.videoUrl() != null) {
+            reel.setVideoUrl(request.videoUrl());
         }
         if (request.authorName() != null) {
             reel.setAuthorName(request.authorName());
@@ -270,6 +304,7 @@ public class ReelService {
                 reel.getShortcode(),
                 reel.getCaption(),
                 reel.getThumbnailUrl(),
+                reel.getVideoUrl(),
                 reel.getAuthorName(),
                 reel.getStatus(),
                 reel.getTranscript(),

@@ -67,6 +67,10 @@ public class SearchService {
             results = new java.util.ArrayList<>(map.values());
         }
 
+        if (collectionId == null) {
+            results = reelService.deduplicateByShortcode(results);
+        }
+
         return results.stream().map(reelService::toResponse).toList();
     }
 }

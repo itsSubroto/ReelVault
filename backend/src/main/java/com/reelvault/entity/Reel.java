@@ -40,6 +40,9 @@ public class Reel {
     @Column(name = "thumbnail_url", length = 2000)
     private String thumbnailUrl;
 
+    @Column(name = "video_url", length = 3000)
+    private String videoUrl;
+
     @Column(name = "author_name", length = 100)
     private String authorName;
 

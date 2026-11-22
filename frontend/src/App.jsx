@@ -118,13 +118,32 @@ export default function App() {
   const loadReels = useCallback(async (showLoadingState = true) => {
     if (showLoadingState) setIsLoading(true);
     try {
+      let data = [];
       if (searchQuery.trim()) {
-        const results = await api.search(searchQuery.trim(), selectedCollectionId);
-        setReels(results || []);
+        data = (await api.search(searchQuery.trim(), selectedCollectionId)) || [];
       } else {
-        const data = await api.getReels(selectedCollectionId);
-        setReels(data || []);
+        data = (await api.getReels(selectedCollectionId)) || [];
       }
+
+      // If viewing all reels (selectedCollectionId === null), deduplicate by shortcode / URL
+      // so the same reel saved in multiple collections appears only once in the all reel section
+      if (!selectedCollectionId && Array.isArray(data)) {
+        const seen = new Map();
+        for (const item of data) {
+          const key = item.shortcode || item.instagramUrl || item.id;
+          if (!seen.has(key)) {
+            seen.set(key, item);
+          } else {
+            const existing = seen.get(key);
+            if (existing.status !== 'DONE' && item.status === 'DONE') {
+              seen.set(key, item);
+            }
+          }
+        }
+        data = Array.from(seen.values());
+      }
+
+      setReels(data || []);
       setErrorBanner(null);
     } catch (err) {
       console.error('Failed to fetch reels:', err);

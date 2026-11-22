@@ -7,6 +7,7 @@ import java.util.List;
 public record ReelUpdateRequest(
     String caption,
     String thumbnailUrl,
+    String videoUrl,
     String authorName,
     String transcript,
     String summary,

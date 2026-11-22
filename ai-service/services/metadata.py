@@ -69,13 +69,19 @@ class MetadataService:
                 caption = info.get('description') or info.get('title') or fallback_title
                 thumbnail_url = info.get('thumbnail')
                 author_name = info.get('uploader') or info.get('channel') or info.get('uploader_id') or fallback_name
+                video_url = info.get('url')
+                if not video_url and info.get('formats'):
+                    valid_formats = [f for f in info.get('formats', []) if f.get('url')]
+                    if valid_formats:
+                        video_url = valid_formats[-1].get('url')
 
-                logger.info(f"Successfully extracted metadata for {shortcode}: platform={platform}, author={author_name}, thumb={'yes' if thumbnail_url else 'no'}")
+                logger.info(f"Successfully extracted metadata for {shortcode}: platform={platform}, author={author_name}, thumb={'yes' if thumbnail_url else 'no'}, video={'yes' if video_url else 'no'}")
                 return {
                     'platform': platform,
                     'shortcode': shortcode,
                     'caption': caption.strip(),
                     'thumbnail_url': thumbnail_url,
+                    'video_url': video_url,
                     'author_name': author_name,
                     'duration': info.get('duration'),
                 }
@@ -86,6 +92,7 @@ class MetadataService:
                 'shortcode': shortcode,
                 'caption': fallback_title,
                 'thumbnail_url': None,
+                'video_url': None,
                 'author_name': fallback_name,
                 'duration': None,
             }

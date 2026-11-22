@@ -60,8 +60,8 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 4. Allow reel status check endpoint (handles both authenticated and unauthenticated queries)
-        if (uri.startsWith("/api/reels/check")) {
+        // 4. Allow reel status check & stream redirect endpoints
+        if (uri.startsWith("/api/reels/check") || uri.matches("^/api/reels/[^/]+/stream/?$")) {
             return true;
         }
 

@@ -43,7 +43,8 @@ public class InstagramService {
             String shortcode,
             String caption,
             String thumbnailUrl,
-            String authorName
+            String authorName,
+            String videoUrl
     ) {}
 
     /**
@@ -99,9 +100,10 @@ public class InstagramService {
                 String caption = root.hasNonNull("caption") ? root.get("caption").asText() : "";
                 String thumbnailUrl = root.hasNonNull("thumbnail_url") ? root.get("thumbnail_url").asText() : null;
                 String authorName = root.hasNonNull("author_name") ? root.get("author_name").asText() : null;
-                if (thumbnailUrl != null || (caption != null && !caption.isBlank())) {
+                String videoUrl = root.hasNonNull("video_url") ? root.get("video_url").asText() : null;
+                if (thumbnailUrl != null || (caption != null && !caption.isBlank()) || videoUrl != null) {
                     log.info("Successfully fetched real metadata from Python service for shortcode: {}", shortcode);
-                    return new InstagramMetadata(shortcode, caption, thumbnailUrl, authorName);
+                    return new InstagramMetadata(shortcode, caption, thumbnailUrl, authorName, videoUrl);
                 }
             }
         } catch (Exception e) {
@@ -145,7 +147,8 @@ public class InstagramService {
                 shortcode,
                 "Saved " + fallbackPlatform + " (" + shortcode + ")",
                 null,
-                fallbackCreator
+                fallbackCreator,
+                null
         );
     }
 
@@ -169,7 +172,7 @@ public class InstagramService {
                 String thumbnailUrl = root.hasNonNull("thumbnail_url") ? root.get("thumbnail_url").asText() : null;
                 String authorName = root.hasNonNull("author_name") ? root.get("author_name").asText() : null;
 
-                return new InstagramMetadata(shortcode, title, thumbnailUrl, authorName);
+                return new InstagramMetadata(shortcode, title, thumbnailUrl, authorName, null);
             }
         } catch (Exception e) {
             log.debug("oEmbed request failed: {}", e.getMessage());

@@ -25,6 +25,7 @@ class AiPipelineService:
         meta = MetadataService.extract_reel_metadata(instagram_url)
         caption = meta.get('caption', '')
         thumbnail_url = meta.get('thumbnail_url')
+        video_url = meta.get('video_url')
         author_name = meta.get('author_name')
 
         # Step 2: Immediate Patch to Spring Boot (Thumbnail & Caption live!)
@@ -34,6 +35,7 @@ class AiPipelineService:
                 {
                     "caption": caption,
                     "thumbnailUrl": thumbnail_url,
+                    "videoUrl": video_url,
                     "authorName": author_name,
                     "status": "PROCESSING",
                 }
@@ -55,6 +57,7 @@ class AiPipelineService:
                 {
                     "caption": caption,
                     "thumbnailUrl": thumbnail_url,
+                    "videoUrl": video_url,
                     "authorName": author_name,
                     "transcript": transcript,
                     "summary": summary,

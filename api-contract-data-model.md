@@ -46,6 +46,7 @@ An Instagram reel saved by the user, belonging to a collection.
 | `shortcode` | `VARCHAR(50)` | NOT NULL | Shortcode extracted from URL (e.g., `C1234abcd`) |
 | `caption` | `TEXT` | NULLABLE | Caption text retrieved via oEmbed / metadata |
 | `thumbnail_url` | `VARCHAR(1000)` | NULLABLE | Thumbnail image URL |
+| `video_url` | `VARCHAR(3000)` | NULLABLE | Direct MP4/video CDN URL for in-platform playback |
 | `author_name` | `VARCHAR(100)` | NULLABLE | Instagram username or creator display name |
 | `status` | `VARCHAR(20)` | NOT NULL, DEFAULT 'SAVED' | Processing status: `SAVED`, `PENDING`, `PROCESSING`, `DONE`, `FAILED` |
 | `transcript` | `TEXT` | NULLABLE | Audio transcription (Phase 2) |
@@ -186,6 +187,7 @@ Base path: `/api`
 - **Path:** `/api/reels`
 - **Query Parameters:**
   - `collectionId` *(optional, UUID)*: Filter by collection. If omitted, returns all reels.
+- **Deduplication:** When `collectionId` is omitted (All Reels), reels saved across multiple collections are automatically deduplicated by `shortcode`, ensuring each video appears once.
 - **Response:** `200 OK` (Array of Reel objects)
 
 #### 2.3.3 Check Reel Status (Extension lookup)
@@ -208,15 +210,20 @@ Base path: `/api`
 - **Path:** `/api/reels/{id}`
 - **Response:** `200 OK` or `404 Not Found`
 
-#### 2.3.5 Delete Reel
+#### 2.3.5 Stream Reel (In-Platform Video Playback)
+- **Method:** `GET`
+- **Path:** `/api/reels/{id}/stream`
+- **Response:** `302 Found` (Redirects directly to `videoUrl` for native HTML5 video player playback without leaving ReelVault)
+
+#### 2.3.6 Delete Reel
 - **Method:** `DELETE`
 - **Path:** `/api/reels/{id}`
 - **Response:** `204 No Content` or `404 Not Found`
 
-#### 2.3.6 Update Reel (Used in Phase 2 callback or manual edit)
+#### 2.3.7 Update Reel (Used in Phase 2 callback or manual edit)
 - **Method:** `PATCH`
 - **Path:** `/api/reels/{id}`
-- **Request Body:** Partial update (transcript, summary, tags, status, caption)
+- **Request Body:** Partial update (transcript, summary, tags, status, caption, videoUrl)
 - **Response:** `200 OK`
 
 ---

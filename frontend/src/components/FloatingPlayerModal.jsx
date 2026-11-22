@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { X, ExternalLink, Maximize2, Minimize2, Sparkles, Tag, Film } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, ExternalLink, Maximize2, Minimize2, Sparkles, Tag, Film, Play, RotateCcw, MonitorPlay, ShieldAlert } from 'lucide-react';
 
 export default function FloatingPlayerModal({ reel, onClose }) {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [playerMode, setPlayerMode] = useState('direct'); // 'direct' | 'embed'
+  const [videoError, setVideoError] = useState(false);
+  const videoRef = useRef(null);
 
   if (!reel) return null;
 
@@ -10,11 +13,27 @@ export default function FloatingPlayerModal({ reel, onClose }) {
     reel.instagramUrl && (reel.instagramUrl.includes('youtube.com') || reel.instagramUrl.includes('youtu.be'))
   );
 
-  const embedUrl = isYouTube
-    ? `https://www.youtube.com/embed/${reel.shortcode}?autoplay=1&rel=0`
-    : `https://www.instagram.com/reel/${reel.shortcode}/embed/captioned/`;
-
   const platformName = isYouTube ? 'YouTube Short' : 'Instagram Reel';
+
+  // Embed URL calculation:
+  // For YouTube: clean autoplay embed
+  // For Instagram: use clean /embed/ (without /captioned/ which injects the redirect overlay)
+  const embedUrl = isYouTube
+    ? `https://www.youtube.com/embed/${reel.shortcode}?autoplay=1&enablejsapi=1&playsinline=1&rel=0`
+    : `https://www.instagram.com/reel/${reel.shortcode}/embed/`;
+
+  // Video direct stream URL
+  const directVideoSrc = reel.videoUrl || `/api/reels/${reel.id}/stream`;
+
+  // Determine whether to use direct HTML5 video player or embed
+  const canPlayDirect = !isYouTube && (reel.videoUrl || !videoError);
+
+  // Auto-switch to embed if direct player errors
+  const handleVideoError = () => {
+    console.warn('Direct video playback unavailable, falling back to embedded player');
+    setVideoError(true);
+    setPlayerMode('embed');
+  };
 
   return (
     <div
@@ -57,17 +76,82 @@ export default function FloatingPlayerModal({ reel, onClose }) {
 
         {/* Video Player Column */}
         <div
-          className={`relative bg-black flex items-center justify-center ${
+          className={`relative bg-black flex flex-col items-center justify-center ${
             isMinimized ? 'aspect-[9/16] max-h-64' : 'flex-1 md:w-3/5 h-64 md:h-full'
           }`}
         >
-          <iframe
-            src={embedUrl}
-            title={reel.caption || 'Video player'}
-            className="w-full h-full border-0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
+          {/* Top Player Mode Switcher (Instagram only) */}
+          {!isYouTube && !isMinimized && (
+            <div className="absolute top-3 left-3 z-20 flex items-center gap-1 p-1 rounded-xl bg-slate-950/80 backdrop-blur-md border border-slate-800 shadow">
+              <button
+                type="button"
+                onClick={() => setPlayerMode('direct')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                  playerMode === 'direct'
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Play in-app HTML5 video"
+              >
+                <MonitorPlay className="w-3 h-3" />
+                <span>In-App Player</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayerMode('embed')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                  playerMode === 'embed'
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="View embedded reel frame"
+              >
+                <Film className="w-3 h-3" />
+                <span>Embed Frame</span>
+              </button>
+            </div>
+          )}
+
+          {/* YouTube Native Embed */}
+          {isYouTube ? (
+            <iframe
+              src={embedUrl}
+              title={reel.caption || 'YouTube player'}
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : playerMode === 'direct' && canPlayDirect ? (
+            /* HTML5 Direct Video Player - Plays in-app without redirecting */
+            <div className="relative w-full h-full flex items-center justify-center bg-black">
+              <video
+                ref={videoRef}
+                key={reel.id}
+                src={directVideoSrc}
+                poster={reel.thumbnailUrl}
+                controls
+                autoPlay
+                playsInline
+                loop
+                onError={handleVideoError}
+                className="w-full h-full max-h-[85vh] object-contain"
+              >
+                Your browser does not support HTML5 video.
+              </video>
+            </div>
+          ) : (
+            /* Instagram Clean Embed with Sandbox Restriction to Prevent Forced Redirects */
+            <div className="relative w-full h-full flex items-center justify-center bg-black">
+              <iframe
+                src={embedUrl}
+                title={reel.caption || 'Instagram reel player'}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                sandbox="allow-scripts allow-same-origin allow-presentation"
+                allowFullScreen
+              />
+            </div>
+          )}
         </div>
 
         {/* Details & Action Column (Hidden if minimized) */}
@@ -150,7 +234,7 @@ export default function FloatingPlayerModal({ reel, onClose }) {
             </div>
 
             {/* Footer Redirect Action */}
-            <div className="pt-4 border-t border-slate-800 mt-4">
+            <div className="pt-4 border-t border-slate-800 mt-4 space-y-2">
               <a
                 href={reel.instagramUrl}
                 target="_blank"

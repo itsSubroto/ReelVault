@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -19,6 +20,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -44,6 +47,9 @@ public class ReelVaultApiTest {
     @Autowired
     private com.reelvault.security.JwtService jwtService;
 
+    @MockitoBean
+    private com.reelvault.service.InstagramService instagramService;
+
     private String authToken;
     private com.reelvault.entity.User testUser;
 
@@ -52,6 +58,21 @@ public class ReelVaultApiTest {
         reelRepository.deleteAll();
         collectionRepository.deleteAll();
         userRepository.deleteAll();
+
+        com.reelvault.service.InstagramService realInstagram = new com.reelvault.service.InstagramService();
+        when(instagramService.extractShortcode(anyString())).thenAnswer(inv -> realInstagram.extractShortcode(inv.getArgument(0)));
+        when(instagramService.isYouTube(anyString())).thenAnswer(inv -> realInstagram.isYouTube(inv.getArgument(0)));
+        when(instagramService.fetchMetadata(anyString())).thenAnswer(inv -> {
+            String url = inv.getArgument(0);
+            String shortcode = realInstagram.extractShortcode(url);
+            return new com.reelvault.service.InstagramService.InstagramMetadata(
+                    shortcode,
+                    "Saved Reel (" + shortcode + ")",
+                    null,
+                    "Creator",
+                    null
+            );
+        });
 
         testUser = userRepository.save(com.reelvault.entity.User.builder()
                 .username("testuser")
@@ -261,5 +282,60 @@ public class ReelVaultApiTest {
     void shouldRejectCurrentUserWithoutToken() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldDeduplicateReelsInAllReelsViewWhenSavedInMultipleCollections() throws Exception {
+        // 1. Create two collections
+        CollectionRequest colReq1 = new CollectionRequest("Quick Save", "Quick saves");
+        MvcResult res1 = mockMvc.perform(post("/api/collections")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(colReq1)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        CollectionResponse col1 = objectMapper.readValue(res1.getResponse().getContentAsString(), CollectionResponse.class);
+
+        CollectionRequest colReq2 = new CollectionRequest("Funny", "Funny reels");
+        MvcResult res2 = mockMvc.perform(post("/api/collections")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(colReq2)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        CollectionResponse col2 = objectMapper.readValue(res2.getResponse().getContentAsString(), CollectionResponse.class);
+
+        // 2. Save same video into Collection 1 and Collection 2
+        ReelRequest reelReq1 = new ReelRequest("https://www.instagram.com/reel/C7dup123/", col1.id());
+        mockMvc.perform(post("/api/reels")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reelReq1)))
+                .andExpect(status().isCreated());
+
+        ReelRequest reelReq2 = new ReelRequest("https://www.instagram.com/reel/C7dup123/", col2.id());
+        mockMvc.perform(post("/api/reels")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reelReq2)))
+                .andExpect(status().isCreated());
+
+        // 3. Verify specific collections each have 1 reel
+        mockMvc.perform(get("/api/reels?collectionId=" + col1.id())
+                        .header("Authorization", "Bearer " + authToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+
+        mockMvc.perform(get("/api/reels?collectionId=" + col2.id())
+                        .header("Authorization", "Bearer " + authToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+
+        // 4. Verify All Reels view (no collectionId) returns ONLY 1 item (deduplicated)
+        mockMvc.perform(get("/api/reels")
+                        .header("Authorization", "Bearer " + authToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].shortcode").value("C7dup123"));
     }
 }

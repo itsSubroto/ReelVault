@@ -41,6 +41,20 @@ public class ReelController {
         return ResponseEntity.ok(reelService.getReelById(id));
     }
 
+    @GetMapping("/{id}/stream")
+    public ResponseEntity<Void> streamReel(@PathVariable UUID id) {
+        com.reelvault.entity.Reel reel = reelService.findEntityById(id);
+        String videoUrl = reel.getVideoUrl();
+        if (videoUrl != null && !videoUrl.isBlank()) {
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(java.net.URI.create(videoUrl))
+                    .build();
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(java.net.URI.create(reel.getInstagramUrl()))
+                .build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReel(@PathVariable UUID id) {
         reelService.deleteReel(id);
