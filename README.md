@@ -40,6 +40,12 @@ ReelVault/
 │   └── services/
 │       ├── metadata.py            # yt-dlp metadata & thumbnail extraction
 │       └── ai_pipeline.py         # Whisper transcription & LLM summarization
+├── extension/                     # Chrome Extension (Manifest V3)
+│   ├── manifest.json              # Extension manifest & permissions
+│   ├── background.js              # Service worker (auth & API proxy)
+│   ├── content.js, content.css    # In-page floating button & collection popup
+│   ├── popup.html, popup.js       # Toolbar popup interface
+│   └── icons/                     # Extension branding icons
 └── frontend/                      # React 19 + Vite Frontend (:5173)
     ├── package.json
     ├── vite.config.js             # Vite config with API proxy to :8080
@@ -92,6 +98,13 @@ npm install
 npm run dev
 ```
 Open `http://localhost:5173` in your browser.
+
+### 5. Install Browser Extension (Chrome / Edge / Brave)
+1. Open `chrome://extensions` (or `edge://extensions` / `brave://extensions`).
+2. Toggle **Developer mode** to **ON** in the top right.
+3. Click **Load unpacked** and select the `extension/` folder in this repo.
+4. Pin the extension to your browser toolbar.
+5. Browse YouTube or Instagram to use the floating **"Save to ReelVault"** button and collection selector window!
 
 ---
 

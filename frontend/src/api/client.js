@@ -13,12 +13,13 @@ export const setToken = (token) => {
   }
 };
 
-export const getToken = () => authToken;
+export const getToken = () => authToken || localStorage.getItem(TOKEN_KEY);
 
 function getAuthHeaders(extraHeaders = {}) {
   const headers = { ...extraHeaders };
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 }
@@ -70,7 +71,7 @@ export const api = {
   },
 
   async getMe() {
-    if (!authToken) return null;
+    if (!getToken()) return null;
     const res = await fetch(`${API_BASE}/auth/me`, {
       headers: getAuthHeaders(),
     });

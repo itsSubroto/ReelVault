@@ -32,19 +32,7 @@ public class AuthInterceptor implements HandlerInterceptor {
         String uri = request.getRequestURI();
         String method = request.getMethod();
 
-        // 1. Public endpoints
-        if (uri.startsWith("/api/auth/") ||
-            uri.startsWith("/api/health") ||
-            uri.startsWith("/h2-console")) {
-            return true;
-        }
-
-        // 2. Allow Python AI service PATCH callback on reels
-        if ("PATCH".equalsIgnoreCase(method) && uri.matches("^/api/reels/[^/]+$")) {
-            return true;
-        }
-
-        // 3. Extract and validate Bearer token
+        // 1. Extract and validate Bearer token first if present
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7).trim();
@@ -54,13 +42,36 @@ public class AuthInterceptor implements HandlerInterceptor {
                     User user = userRepository.findById(userId).orElse(null);
                     if (user != null) {
                         UserContext.setCurrentUser(user);
-                        return true;
                     }
                 }
             }
         }
 
-        // 4. Unauthorized
+        // 2. Public endpoints (do not require authentication)
+        // Note: /api/auth/login and /api/auth/register are public, but /api/auth/me requires authentication!
+        if (uri.matches("^/api/auth/(login|register)/?$") ||
+            uri.startsWith("/api/health") ||
+            uri.startsWith("/h2-console")) {
+            return true;
+        }
+
+        // 3. Allow Python AI service PATCH callback on reels without user token
+        if ("PATCH".equalsIgnoreCase(method) && uri.matches("^/api/reels/[^/]+$")) {
+            return true;
+        }
+
+        // 4. Allow reel status check endpoint (handles both authenticated and unauthenticated queries)
+        if (uri.startsWith("/api/reels/check")) {
+            return true;
+        }
+
+        // 5. Protected endpoints (including /api/auth/me, /api/reels, /api/collections, /api/search):
+        // Must have an authenticated user in context
+        if (UserContext.getCurrentUser() != null) {
+            return true;
+        }
+
+        // 6. Unauthorized response
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");

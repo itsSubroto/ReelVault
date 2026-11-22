@@ -158,27 +158,53 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [loadReels, currentUser]);
 
-  // Auto-poll when any reel is currently PROCESSING or during the post-save polling window
+  // Auto-refresh when the window/tab regains focus or visibility (e.g. after saving via extension)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const handleFocusOrVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadReels(false);
+        loadCollections();
+      }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisible);
+    document.addEventListener('visibilitychange', handleFocusOrVisible);
+
+    return () => {
+      window.removeEventListener('focus', handleFocusOrVisible);
+      document.removeEventListener('visibilitychange', handleFocusOrVisible);
+    };
+  }, [currentUser, loadReels, loadCollections]);
+
+  // Auto-poll: every 2s when PROCESSING/post-save window, or every 6s while active so new extension saves show up automatically
   useEffect(() => {
     if (!currentUser) return;
     const hasProcessing = reels.some((r) => r.status === 'PROCESSING');
     const isWindowActive = Date.now() < pollingUntil;
-
-    if (!hasProcessing && !isWindowActive) return;
+    const pollInterval = (hasProcessing || isWindowActive) ? 2000 : 6000;
 
     const interval = setInterval(() => {
-      loadReels(false);
-    }, 2000);
+      if (document.visibilityState === 'visible') {
+        loadReels(false);
+        loadCollections();
+      }
+    }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [reels, pollingUntil, loadReels, currentUser]);
+  }, [reels, pollingUntil, loadReels, loadCollections, currentUser]);
 
   // Handle Reel Save
   const handleSaveReel = async (url, collectionId) => {
     await api.saveReel(url, collectionId);
     // Keep active polling for 20s so the UI updates automatically as soon as AI enrichment finishes
     setPollingUntil(Date.now() + 20000);
-    await Promise.all([loadReels(false), loadCollections()]);
+    if (collectionId && selectedCollectionId && selectedCollectionId !== collectionId) {
+      setSelectedCollectionId(collectionId);
+    } else {
+      await Promise.all([loadReels(false), loadCollections()]);
+    }
   };
 
   // Handle Single Reel AI Processing

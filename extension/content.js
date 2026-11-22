@@ -146,49 +146,295 @@
     );
   }
 
-  // Save button click handler
-  async function handleSaveClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
+  let floatingPopup = null;
 
-    if (saveButton.classList.contains('is-loading')) return;
+  function closeFloatingPopup() {
+    if (floatingPopup && document.body.contains(floatingPopup)) {
+      floatingPopup.remove();
+    }
+    floatingPopup = null;
+  }
 
-    const url = window.location.href;
-    setButtonState('loading', 'Saving video...');
+  function detectPlatform(url) {
+    if (!url) return { name: 'Video', type: 'other' };
+    if (/youtube\.com\/shorts/i.test(url)) return { name: 'YouTube Short', type: 'youtube' };
+    if (/youtube\.com\/watch|youtu\.be/i.test(url)) return { name: 'YouTube Video', type: 'youtube' };
+    if (/instagram\.com\/reel/i.test(url)) return { name: 'Instagram Reel', type: 'instagram' };
+    if (/instagram\.com\/p/i.test(url)) return { name: 'Instagram Post', type: 'instagram' };
+    return { name: 'Video', type: 'other' };
+  }
 
-    chrome.runtime.sendMessage(
-      { action: 'SAVE_VIDEO', payload: { url } },
-      (response) => {
-        if (chrome.runtime.lastError || !response || !response.success) {
-          const errorMsg = response?.error || chrome.runtime.lastError?.message || 'Could not save video';
-          setButtonState('ready');
+  // Open the Floating Save & Collection Selector Window
+  async function openSavePopup() {
+    if (floatingPopup) {
+      closeFloatingPopup();
+      return;
+    }
 
-          if (response?.status === 401) {
-            showToast(
-              'Sign In Required',
-              'Please click the ReelVault extension icon in your toolbar to log in first.',
-              false,
-              'Click to open settings'
-            );
-          } else if (errorMsg.toLowerCase().includes('already saved')) {
-            setButtonState('saved', 'In ReelVault');
-            showToast('Already Saved', 'This video is already saved in your collection.', true);
-          } else {
-            showToast('Save Failed', errorMsg, false, null);
-          }
+    const currentVideoUrl = window.location.href;
+    const platform = detectPlatform(currentVideoUrl);
+    const pageTitle = document.title || 'Saved Video';
+
+    floatingPopup = document.createElement('div');
+    floatingPopup.className = 'reelvault-floating-popup';
+    floatingPopup.addEventListener('click', (e) => e.stopPropagation());
+
+    floatingPopup.innerHTML = `
+      <div class="reelvault-popup-header">
+        <div class="reelvault-popup-title">
+          <svg class="reelvault-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span>Save to ReelVault</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="reelvault-popup-platform-badge">${platform.name}</span>
+          <button class="reelvault-popup-close-btn" id="rv-popup-close" title="Close">&times;</button>
+        </div>
+      </div>
+
+      <div class="reelvault-video-preview">
+        <div class="reelvault-video-preview-title" title="${pageTitle}">${pageTitle}</div>
+        <div class="reelvault-video-preview-url">${currentVideoUrl}</div>
+      </div>
+
+      <div id="rv-popup-body">
+        <div style="text-align:center;padding:12px;color:#94a3b8;font-size:12px;">
+          <div class="reelvault-spinner" style="margin:0 auto 8px auto;"></div>
+          Loading your collections...
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(floatingPopup);
+
+    // Close button
+    const closeBtn = floatingPopup.querySelector('#rv-popup-close');
+    closeBtn.addEventListener('click', closeFloatingPopup);
+
+    // Escape listener & outside click listener
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeFloatingPopup();
+        document.removeEventListener('keydown', onKeyDown);
+        document.removeEventListener('pointerdown', onPointerDown);
+      }
+    };
+    const onPointerDown = (e) => {
+      if (floatingPopup && !floatingPopup.contains(e.target) && !saveButton?.contains(e.target)) {
+        closeFloatingPopup();
+        document.removeEventListener('keydown', onKeyDown);
+        document.removeEventListener('pointerdown', onPointerDown);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    setTimeout(() => document.addEventListener('pointerdown', onPointerDown), 50);
+
+    // Fetch settings to check authentication
+    chrome.runtime.sendMessage({ action: 'GET_SETTINGS' }, (settingsRes) => {
+      if (chrome.runtime.lastError || !settingsRes?.data?.token) {
+        renderSignInRequired();
+        return;
+      }
+
+      // Fetch collections
+      chrome.runtime.sendMessage({ action: 'GET_COLLECTIONS' }, (colRes) => {
+        const collections = (colRes && colRes.success && Array.isArray(colRes.data)) ? colRes.data : [];
+        renderCollectionSelector(collections);
+      });
+    });
+
+    function renderSignInRequired() {
+      const body = floatingPopup.querySelector('#rv-popup-body');
+      if (!body) return;
+      body.innerHTML = `
+        <div class="reelvault-alert reelvault-alert-info">
+          <span>🔒 Please sign in to ReelVault to organize and save your reels.</span>
+        </div>
+        <p style="font-size:12px;color:#94a3b8;margin:8px 0 12px 0;line-height:1.4;">
+          Open the ReelVault extension from your Chrome toolbar or visit the web app to log in.
+        </p>
+        <div class="reelvault-popup-footer">
+          <button class="reelvault-btn-cancel" id="rv-btn-dismiss">Dismiss</button>
+          <button class="reelvault-btn-save" id="rv-btn-open-app">Open Web App</button>
+        </div>
+      `;
+      body.querySelector('#rv-btn-dismiss')?.addEventListener('click', closeFloatingPopup);
+      body.querySelector('#rv-btn-open-app')?.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ action: 'OPEN_WEB' });
+        closeFloatingPopup();
+      });
+    }
+
+    function renderCollectionSelector(collections) {
+      const body = floatingPopup.querySelector('#rv-popup-body');
+      if (!body) return;
+
+      const optionsHtml = collections.map((c) =>
+        `<option value="${c.id}">${c.name} (${c.reelCount || 0})</option>`
+      ).join('');
+
+      body.innerHTML = `
+        <div id="rv-error-banner" class="reelvault-alert reelvault-alert-error" style="display:none;"></div>
+
+        <div class="reelvault-field-group">
+          <div class="reelvault-field-header">
+            <span class="reelvault-field-label">Save To Collection</span>
+            <button type="button" class="reelvault-btn-link" id="rv-toggle-new-col">+ New Collection</button>
+          </div>
+          <select class="reelvault-select" id="rv-select-col">
+            <option value="">⚡ Quick Save (Default)</option>
+            ${optionsHtml}
+          </select>
+        </div>
+
+        <!-- Inline New Collection Form (hidden initially) -->
+        <div id="rv-new-col-box" class="reelvault-create-col-box" style="display:none;">
+          <input type="text" id="rv-new-col-name" class="reelvault-input" placeholder="New collection name (e.g. Recipes, Workout)" />
+          <input type="text" id="rv-new-col-desc" class="reelvault-input" placeholder="Description (optional)" />
+          <div class="reelvault-create-actions">
+            <button type="button" class="reelvault-btn-sm reelvault-btn-sm-secondary" id="rv-cancel-new-col">Cancel</button>
+            <button type="button" class="reelvault-btn-sm reelvault-btn-sm-primary" id="rv-save-new-col">Create</button>
+          </div>
+        </div>
+
+        <div class="reelvault-popup-footer">
+          <button type="button" class="reelvault-btn-cancel" id="rv-btn-cancel">Cancel</button>
+          <button type="button" class="reelvault-btn-save" id="rv-btn-save">
+            <svg class="reelvault-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span id="rv-save-label">Save Reel</span>
+          </button>
+        </div>
+      `;
+
+      const selectCol = body.querySelector('#rv-select-col');
+      const toggleNewBtn = body.querySelector('#rv-toggle-new-col');
+      const newColBox = body.querySelector('#rv-new-col-box');
+      const newColName = body.querySelector('#rv-new-col-name');
+      const newColDesc = body.querySelector('#rv-new-col-desc');
+      const cancelNewBtn = body.querySelector('#rv-cancel-new-col');
+      const saveNewBtn = body.querySelector('#rv-save-new-col');
+      const cancelBtn = body.querySelector('#rv-btn-cancel');
+      const saveBtn = body.querySelector('#rv-btn-save');
+      const saveLabel = body.querySelector('#rv-save-label');
+      const errorBanner = body.querySelector('#rv-error-banner');
+
+      function showError(msg) {
+        errorBanner.textContent = msg;
+        errorBanner.style.display = 'flex';
+      }
+
+      function hideError() {
+        errorBanner.style.display = 'none';
+        errorBanner.textContent = '';
+      }
+
+      toggleNewBtn.addEventListener('click', () => {
+        const isHidden = newColBox.style.display === 'none';
+        newColBox.style.display = isHidden ? 'flex' : 'none';
+        toggleNewBtn.textContent = isHidden ? 'Select Existing' : '+ New Collection';
+        if (isHidden) newColName.focus();
+      });
+
+      cancelNewBtn.addEventListener('click', () => {
+        newColBox.style.display = 'none';
+        toggleNewBtn.textContent = '+ New Collection';
+        newColName.value = '';
+        newColDesc.value = '';
+      });
+
+      saveNewBtn.addEventListener('click', () => {
+        const name = newColName.value.trim();
+        if (!name) {
+          showError('Collection name is required');
           return;
         }
 
-        const data = response.data;
-        const colName = data?.collectionName || 'Quick Save';
-        setButtonState('saved', `Saved to ${colName}`);
-        showToast(
-          'Saved to ReelVault! 🚀',
-          `Added to "${colName}". Transcribing and AI tags in progress.`,
-          true
+        saveNewBtn.disabled = true;
+        saveNewBtn.textContent = 'Creating...';
+        hideError();
+
+        chrome.runtime.sendMessage(
+          { action: 'CREATE_COLLECTION', payload: { name, description: newColDesc.value.trim() } },
+          (res) => {
+            saveNewBtn.disabled = false;
+            saveNewBtn.textContent = 'Create';
+
+            if (chrome.runtime.lastError || !res || !res.success) {
+              showError(res?.error || 'Failed to create collection');
+              return;
+            }
+
+            const created = res.data;
+            const newOption = document.createElement('option');
+            newOption.value = created.id;
+            newOption.textContent = `${created.name} (0)`;
+            selectCol.appendChild(newOption);
+            selectCol.value = created.id;
+
+            newColBox.style.display = 'none';
+            toggleNewBtn.textContent = '+ New Collection';
+            newColName.value = '';
+            newColDesc.value = '';
+          }
         );
-      }
-    );
+      });
+
+      cancelBtn.addEventListener('click', closeFloatingPopup);
+
+      saveBtn.addEventListener('click', () => {
+        const selectedCollectionId = selectCol.value || null;
+        const selectedColName = selectCol.options[selectCol.selectedIndex]?.text.replace(/\s*\(\d+\)$/, '') || 'Quick Save';
+
+        saveBtn.disabled = true;
+        saveLabel.textContent = 'Saving...';
+        setButtonState('loading', 'Saving...');
+        hideError();
+
+        chrome.runtime.sendMessage(
+          { action: 'SAVE_VIDEO', payload: { url: currentVideoUrl, collectionId: selectedCollectionId } },
+          (response) => {
+            if (chrome.runtime.lastError || !response || !response.success) {
+              saveBtn.disabled = false;
+              saveLabel.textContent = 'Save Reel';
+              setButtonState('ready');
+
+              const errorMsg = response?.error || chrome.runtime.lastError?.message || 'Could not save video';
+              if (response?.status === 401) {
+                showError('Session expired. Please sign in via the extension.');
+              } else if (errorMsg.toLowerCase().includes('already saved')) {
+                setButtonState('saved', `In ${selectedColName}`);
+                showToast('Already Saved', `This reel is already in "${selectedColName}".`, true);
+                closeFloatingPopup();
+              } else {
+                showError(errorMsg);
+              }
+              return;
+            }
+
+            const data = response.data;
+            const finalColName = data?.collectionName || selectedColName || 'Quick Save';
+
+            closeFloatingPopup();
+            setButtonState('saved', `Saved to ${finalColName}`);
+            showToast(
+              'Saved to ReelVault! 🚀',
+              `Added to "${finalColName}". Transcribing & AI enrichment in progress.`,
+              true
+            );
+          }
+        );
+      });
+    }
+  }
+
+  // Floating save button click handler
+  function handleSaveClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    openSavePopup();
   }
 
   // Initialize on page load

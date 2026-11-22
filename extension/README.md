@@ -6,10 +6,14 @@ The official browser companion extension for **ReelVault**. Quickly save YouTube
 
 ## 🚀 Features
 
-1. **⚡ 1-Click Save (In-Page Floating Button)**:
-   - Floating "Save to ReelVault" action button appears automatically when watching any YouTube video, Shorts, or browsing Instagram Reels.
-   - Shows instant visual feedback (`Saving...` &rarr; `✓ In ReelVault`).
-   - In-page toast notification with a quick link to open ReelVault dashboard.
+1. **⚡ Interactive In-Page Floating Window (Collection Selector & Inline Creator)**:
+   - A sleek, unobtrusive "Save to ReelVault" floating action button appears automatically when watching any YouTube video, YouTube Short, or browsing Instagram Reels.
+   - Clicking the floating button opens an elegant **floating window popup** directly on the page:
+     - Automatically displays the active video title and platform badge.
+     - Lets you choose which collection to save into (or defaults to `⚡ Quick Save`).
+     - Includes a **`+ New Collection`** button to create a new collection on the fly and immediately select it without leaving Instagram or YouTube.
+   - Provides live feedback (`Saving...` &rarr; `✓ Saved in <Collection Name>`).
+   - Shows an in-page toast notification with a direct link to open the ReelVault web app.
 
 2. **📌 Extension Toolbar Popup**:
    - Automatically detects active tab's platform (YouTube / Instagram) and video title.

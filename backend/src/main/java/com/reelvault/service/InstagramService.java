@@ -32,7 +32,10 @@ public class InstagramService {
     private String accessToken;
 
     public InstagramService() {
-        this.restTemplate = new RestTemplate();
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(java.time.Duration.ofSeconds(2));
+        factory.setReadTimeout(java.time.Duration.ofSeconds(2));
+        this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
     }
 

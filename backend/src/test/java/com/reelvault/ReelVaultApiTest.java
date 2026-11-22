@@ -246,4 +246,20 @@ public class ReelVaultApiTest {
                 .andExpect(jsonPath("$.status").value("UP"))
                 .andExpect(jsonPath("$.service").value("ReelVault API"));
     }
+
+    @Test
+    void shouldGetCurrentUserWithValidToken() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + authToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(testUser.getId().toString()))
+                .andExpect(jsonPath("$.username").value("testuser"))
+                .andExpect(jsonPath("$.email").value("test@example.com"));
+    }
+
+    @Test
+    void shouldRejectCurrentUserWithoutToken() throws Exception {
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized());
+    }
 }

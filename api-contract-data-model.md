@@ -6,12 +6,28 @@ This document defines the data model, database schema, and REST API specificatio
 
 ## 1. Data Model
 
-### 1.1 Collection (`collections`)
+### 1.1 User (`users`)
+Represents an authenticated user account.
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `UUID` | PRIMARY KEY | Unique identifier (generated) |
+| `username` | `VARCHAR(50)` | NOT NULL, UNIQUE | User login handle |
+| `email` | `VARCHAR(100)` | NOT NULL, UNIQUE | User email address |
+| `password` | `VARCHAR(255)` | NOT NULL | BCrypt / Argon2 hashed password |
+| `name` | `VARCHAR(100)` | NULLABLE | Display name |
+| `created_at` | `TIMESTAMP WITH TIME ZONE` | NOT NULL | Account creation timestamp |
+| `updated_at` | `TIMESTAMP WITH TIME ZONE` | NOT NULL | Last update timestamp |
+
+---
+
+### 1.2 Collection (`collections`)
 A user-defined folder or category to organize saved reels (e.g., "Tech", "Recipes", "Gym", "Design").
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `UUID` | PRIMARY KEY | Unique identifier (generated) |
+| `user_id` | `UUID` | NULLABLE, FK(`users.id` ON DELETE CASCADE) | Owner of this collection |
 | `name` | `VARCHAR(100)` | NOT NULL | Collection name (e.g., "Tech Tips") |
 | `description` | `VARCHAR(255)` | NULLABLE | Optional brief description |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | NOT NULL | Creation timestamp |
@@ -19,7 +35,7 @@ A user-defined folder or category to organize saved reels (e.g., "Tech", "Recipe
 
 ---
 
-### 1.2 Reel (`reels`)
+### 1.3 Reel (`reels`)
 An Instagram reel saved by the user, belonging to a collection.
 
 | Column | Type | Constraints | Description |
@@ -45,7 +61,58 @@ An Instagram reel saved by the user, belonging to a collection.
 All endpoints use JSON for request and response bodies unless otherwise specified.
 Base path: `/api`
 
-### 2.1 Collections API
+### 2.1 Authentication API
+
+#### 2.1.1 Register
+- **Method:** `POST`
+- **Path:** `/api/auth/register`
+- **Public:** Yes
+- **Request Body:**
+```json
+{
+  "username": "divya",
+  "email": "divya@example.com",
+  "password": "securepassword123",
+  "name": "Divya Patani"
+}
+```
+- **Response:** `201 Created`
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "e6a0d24f-a2e6-42d4-ba09-5a91b29a67e9",
+    "username": "divya",
+    "email": "divya@example.com",
+    "name": "Divya Patani",
+    "createdAt": "2026-11-21T16:00:00Z"
+  }
+}
+```
+
+#### 2.1.2 Login
+- **Method:** `POST`
+- **Path:** `/api/auth/login`
+- **Public:** Yes
+- **Request Body:**
+```json
+{
+  "usernameOrEmail": "divya",
+  "password": "securepassword123"
+}
+```
+- **Response:** `200 OK` (returns JWT `token` and `user` object)
+
+#### 2.1.3 Get Current User Profile (Session validation)
+- **Method:** `GET`
+- **Path:** `/api/auth/me`
+- **Header:** `Authorization: Bearer <jwt_token>`
+- **Public:** No (Requires valid JWT)
+- **Response:** `200 OK` (returns authenticated `user` object) or `401 Unauthorized`
+
+---
+
+### 2.2 Collections API
 
 #### 2.1.1 List All Collections
 - **Method:** `GET`
@@ -86,23 +153,24 @@ Base path: `/api`
 }
 ```
 
-#### 2.1.3 Get Collection by ID
+#### 2.2.3 Get Collection by ID
 - **Method:** `GET`
 - **Path:** `/api/collections/{id}`
 - **Response:** `200 OK` or `404 Not Found`
 
-#### 2.1.4 Delete Collection
+#### 2.2.4 Delete Collection
 - **Method:** `DELETE`
 - **Path:** `/api/collections/{id}`
 - **Response:** `204 No Content` or `404 Not Found`
 
 ---
 
-### 2.2 Reels API
+### 2.3 Reels API
 
-#### 2.2.1 Save a Reel
+#### 2.3.1 Save a Reel
 - **Method:** `POST`
 - **Path:** `/api/reels`
+- **Header:** `Authorization: Bearer <jwt_token>` (recommended)
 - **Request Body:**
 ```json
 {
@@ -110,49 +178,42 @@ Base path: `/api`
   "collectionId": "7b8449c7-f58c-4977-b8db-4e78db382451"
 }
 ```
-- **Behavior:**
-  1. Validates Instagram reel/post URL format.
-  2. Extracts shortcode (`C7xyz123abc`).
-  3. Fetches caption and thumbnail via Instagram oEmbed / metadata service.
-  4. Persists reel with status `SAVED`.
+*(Note: If `collectionId` is omitted, auto-saves to user's "Quick Save" default collection).*
 - **Response:** `201 Created`
-```json
-{
-  "id": "e4f8d223-388b-4a5c-91e8-782637b12abc",
-  "collectionId": "7b8449c7-f58c-4977-b8db-4e78db382451",
-  "collectionName": "Tech Tips",
-  "instagramUrl": "https://www.instagram.com/reel/C7xyz123abc/",
-  "shortcode": "C7xyz123abc",
-  "caption": "5 terminal shortcuts every developer should know! #coding #developer #tips",
-  "thumbnailUrl": "https://scontent.cdninstagram.com/...",
-  "authorName": "tech_master",
-  "status": "SAVED",
-  "transcript": null,
-  "summary": null,
-  "tags": [],
-  "createdAt": "2026-09-10T18:40:00Z",
-  "updatedAt": "2026-09-10T18:40:00Z"
-}
-```
 
-#### 2.2.2 List Reels
+#### 2.3.2 List Reels
 - **Method:** `GET`
 - **Path:** `/api/reels`
 - **Query Parameters:**
   - `collectionId` *(optional, UUID)*: Filter by collection. If omitted, returns all reels.
 - **Response:** `200 OK` (Array of Reel objects)
 
-#### 2.2.3 Get Reel by ID
+#### 2.3.3 Check Reel Status (Extension lookup)
+- **Method:** `GET`
+- **Path:** `/api/reels/check?url={url}`
+- **Response:** `200 OK`
+```json
+{
+  "saved": true,
+  "reel": {
+    "id": "e4f8d223-388b-4a5c-91e8-782637b12abc",
+    "shortcode": "C7xyz123abc",
+    "collectionName": "Tech Tips"
+  }
+}
+```
+
+#### 2.3.4 Get Reel by ID
 - **Method:** `GET`
 - **Path:** `/api/reels/{id}`
 - **Response:** `200 OK` or `404 Not Found`
 
-#### 2.2.4 Delete Reel
+#### 2.3.5 Delete Reel
 - **Method:** `DELETE`
 - **Path:** `/api/reels/{id}`
 - **Response:** `204 No Content` or `404 Not Found`
 
-#### 2.2.5 Update Reel (Used in Phase 2 callback or manual edit)
+#### 2.3.6 Update Reel (Used in Phase 2 callback or manual edit)
 - **Method:** `PATCH`
 - **Path:** `/api/reels/{id}`
 - **Request Body:** Partial update (transcript, summary, tags, status, caption)
@@ -160,7 +221,7 @@ Base path: `/api`
 
 ---
 
-### 2.3 Search API
+### 2.4 Search API
 
 #### 2.3.1 Search Reels by Keyword
 - **Method:** `GET`

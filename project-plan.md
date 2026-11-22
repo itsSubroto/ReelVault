@@ -64,15 +64,24 @@ Yeh ek **learning project** bhi hai — do log alag-alag stacks (Java/Spring Boo
 
 ---
 
-## Phase 3 — Faster Saving & Polish
+## Phase 3 — Faster Saving, Browser Extension & User Authentication
 
-**Goal:** Remove friction from the "paste a link" step, and make the tool nice enough to potentially share with others.
+**Goal:** Remove friction from the "paste a link" step, add multi-user security, and make saving instantaneous across Instagram and YouTube.
 
-- [ ] **Chrome extension** — adds a "Save to [App]" button directly on Instagram, skips the copy-paste step
-- [ ] Better search — move from basic keyword match to Postgres full-text ranking, or embeddings-based semantic search (find reels by meaning, not just exact words)
-- [ ] Multi-user support + proper auth (if you decide to open this up beyond the two of you)
-- [ ] UI polish — better thumbnails, tag filters, sort by date/collection
-- [ ] Rate-limiting / cost controls on the AI pipeline (Whisper + LLM calls add up if usage grows)
+- [x] **Browser Extension (Manifest V3)**:
+  - Floating action button on Instagram Reels and YouTube Shorts/Videos.
+  - Interactive floating window popup to select destination collection or create new collections on the fly.
+  - Extension toolbar popup with active tab video detection, collection switcher, inline creator, and backend status.
+  - Context menu (**⚡ Save to ReelVault**) and global keyboard shortcut (**`Alt + Shift + S`**).
+- [x] **User Authentication & Session Persistence**:
+  - Secure JWT authentication (`/api/auth/register`, `/api/auth/login`, `/api/auth/me`).
+  - Strict interceptor token extraction ensuring persistent login across browser page refreshes.
+  - User-scoped collection and reel isolation.
+- [x] **Real-Time Web Dashboard Sync**:
+  - Instant background refresh via `focus` and `visibilitychange` listeners when returning from extension saves.
+  - Automatic active polling during AI enrichment and periodic sync while tab is active.
+- [ ] Better search ranking — move from basic keyword match to Postgres full-text ranking or embeddings-based semantic search
+- [ ] Rate-limiting / cost controls on the AI pipeline (Whisper + LLM calls)
 
 **Not planned yet, revisit only if Phase 3 is reached:** native Android/iOS app, public multi-tenant product, monetization.
 
