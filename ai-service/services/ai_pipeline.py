@@ -76,37 +76,69 @@ class AiPipelineService:
             except Exception:
                 pass
 
+    
     @classmethod
-    def _transcribe(cls, instagram_url: str, fallback_caption: str) -> str:
+    def _transcribe(cls, instagram_url: str, fallback_caption: str = "") -> str:
         """
-        Attempts audio download and transcription via Whisper.
-        Falls back to caption context if Whisper or ffmpeg is not installed.
+        Downloads the reel's audio and transcribes actual spoken words using Whisper.
+
+        IMPORTANT:
+        Never use the Instagram caption as a transcript.
+        If transcription fails, return an empty string.
         """
         try:
             import whisper
             import yt_dlp
 
             with tempfile.TemporaryDirectory() as tmpdir:
+
                 audio_path = os.path.join(tmpdir, "audio.mp3")
+
                 ydl_opts = {
-                    'format': 'bestaudio/best',
-                    'outtmpl': audio_path,
-                    'quiet': True,
-                    'no_warnings': True,
+                    "format": "bestaudio/best",
+                    "outtmpl": os.path.join(tmpdir, "audio.%(ext)s"),
+                    "quiet": True,
+                    "no_warnings": True,
+                    "postprocessors": [{
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "192",
+                    }],
                 }
+
+                # Download audio and convert it to MP3.
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([instagram_url])
 
-                if os.path.exists(audio_path):
-                    model = whisper.load_model("base")
-                    result = model.transcribe(audio_path)
-                    text = result.get('text', '').strip()
-                    if text:
-                        return text
-        except Exception as e:
-            logger.debug(f"Audio transcription bypassed ({e}). Using caption context.")
+                # Check whether audio extraction succeeded.
+                if not os.path.exists(audio_path):
+                    logger.error("Audio file was not created for %s", instagram_url)
+                    return ""
 
-        return fallback_caption if fallback_caption else "No spoken audio transcript available."
+                logger.info("Audio downloaded. Starting Whisper transcription.")
+
+                # Load Whisper's base model.
+                model = whisper.load_model("base")
+
+                # Convert actual audio into text.
+                result = model.transcribe(audio_path)
+
+                transcript = result.get("text", "").strip()
+
+                if transcript:
+                    logger.info("Transcription successful.")
+                    return transcript
+
+                logger.warning("Whisper returned an empty transcript.")
+                return ""
+
+        except Exception:
+            logger.exception(
+                "Audio transcription failed for URL: %s",
+                instagram_url
+            )
+            return ""
+
 
     @classmethod
     def _generate_summary_and_tags(cls, caption: str, transcript: str) -> tuple[str, list[str]]:
