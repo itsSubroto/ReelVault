@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.reelvault.exception.BadRequestException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -27,16 +28,23 @@ public class InstagramService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final String aiServiceUrl;
 
     @Value("${reelvault.instagram.access-token:}")
     private String accessToken;
 
     public InstagramService() {
+        this("http://localhost:8000");
+    }
+
+    @Autowired
+    public InstagramService(@Value("${reelvault.ai-service.url:http://localhost:8000}") String aiServiceUrl) {
         org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(java.time.Duration.ofSeconds(2));
         factory.setReadTimeout(java.time.Duration.ofSeconds(2));
         this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
+        this.aiServiceUrl = aiServiceUrl.endsWith("/") ? aiServiceUrl.substring(0, aiServiceUrl.length() - 1) : aiServiceUrl;
     }
 
     public record InstagramMetadata(
@@ -89,7 +97,7 @@ public class InstagramService {
         // 1. Try Python AI metadata extractor (yt-dlp handles both Instagram and YouTube)
         try {
             URI uri = org.springframework.web.util.UriComponentsBuilder
-                    .fromUriString("http://localhost:8000/api/metadata")
+                    .fromUriString(aiServiceUrl + "/api/metadata")
                     .queryParam("url", cleanUrl)
                     .build()
                     .toUri();

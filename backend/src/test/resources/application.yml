@@ -10,7 +10,13 @@ spring:
     properties:
       hibernate:
         format_sql: false
+  flyway:
+    enabled: false
 
 reelvault:
   instagram:
     access-token: ""
+  ai-service:
+    url: "http://localhost:8000"
+  admin:
+    secret: "test-admin-secret"

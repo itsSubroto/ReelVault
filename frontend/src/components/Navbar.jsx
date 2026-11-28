@@ -65,7 +65,7 @@ export default function Navbar({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search reels by caption, transcript, summary, or tags..."
+              placeholder="Describe what you're looking for, or search by caption, transcript, tags..."
               className="w-full pl-9 pr-20 py-2 rounded-xl bg-slate-950/70 border border-slate-700/60 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all"
             />
             <div className="absolute right-3 flex items-center gap-1.5 pointer-events-none">

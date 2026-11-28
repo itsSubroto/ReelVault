@@ -4,6 +4,7 @@ import logging
 import tempfile
 import requests
 from .metadata import MetadataService
+from .embedding_service import EmbeddingService
 
 logger = logging.getLogger("ai_service.pipeline")
 
@@ -50,20 +51,45 @@ class AiPipelineService:
         # Step 4: AI Summarization and Tag Generation
         summary, tags = cls._generate_summary_and_tags(caption, transcript)
 
-        # Step 5: Final Patch with Full AI Data and status='DONE'
+        # Step 5: Semantic Embedding Generation (768-d vector)
+        embedding = None
+        embedding_model = None
+        embedding_status = "FAILED"
+        try:
+            embedding, embedding_model = EmbeddingService.generate_document_embedding(
+                caption=caption,
+                transcript=transcript,
+                summary=summary,
+                tags=tags,
+                author_name=author_name,
+            )
+            embedding_status = "DONE"
+            logger.info(
+                f"Generated {len(embedding)}-d embedding for reel {reel_id} using {embedding_model}"
+            )
+        except Exception as emb_err:
+            logger.error(f"Embedding generation failed for reel {reel_id}: {emb_err}")
+
+        # Step 6: Final Patch with Full AI Data, Embedding, and status='DONE'
+        patch_payload = {
+            "caption": caption,
+            "thumbnailUrl": thumbnail_url,
+            "videoUrl": video_url,
+            "authorName": author_name,
+            "transcript": transcript,
+            "summary": summary,
+            "tags": tags,
+            "status": "DONE",
+            "embeddingModel": embedding_model,
+            "embeddingStatus": embedding_status,
+        }
+        if embedding is not None:
+            patch_payload["embedding"] = embedding
+
         try:
             cls._patch_spring_boot(
                 f"{spring_boot_url}/api/reels/{reel_id}",
-                {
-                    "caption": caption,
-                    "thumbnailUrl": thumbnail_url,
-                    "videoUrl": video_url,
-                    "authorName": author_name,
-                    "transcript": transcript,
-                    "summary": summary,
-                    "tags": tags,
-                    "status": "DONE",
-                }
+                patch_payload,
             )
             logger.info(f"Completed processing for reel {reel_id}, marked as DONE with {len(tags)} tags")
         except Exception as e:

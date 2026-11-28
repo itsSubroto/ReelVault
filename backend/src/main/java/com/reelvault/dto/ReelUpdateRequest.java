@@ -1,5 +1,6 @@
 package com.reelvault.dto;
 
+import com.reelvault.entity.EmbeddingStatus;
 import com.reelvault.entity.ReelStatus;
 
 import java.util.List;
@@ -12,5 +13,8 @@ public record ReelUpdateRequest(
     String transcript,
     String summary,
     List<String> tags,
-    ReelStatus status
+    ReelStatus status,
+    List<Double> embedding,
+    String embeddingModel,
+    EmbeddingStatus embeddingStatus
 ) {}

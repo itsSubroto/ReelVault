@@ -1,0 +1,113 @@
+{
+  "documents": [
+    {
+      "id": "reel_docker_k8s",
+      "platform": "youtube_short",
+      "caption": "Ship microservices faster with containers and Kubernetes pods",
+      "summary": "Step-by-step guide to container orchestration, pod scaling, and DevOps deployment.",
+      "transcript": "When your backend grows, packaging services in containers and orchestrating pods with Kubernetes keeps deployments reliable.",
+      "tags": ["docker", "kubernetes", "devops", "microservices"],
+      "author_name": "cloud_architect"
+    },
+    {
+      "id": "reel_paneer_breakfast",
+      "platform": "instagram_reel",
+      "caption": "10 minute high protein vegetarian breakfast bowl",
+      "summary": "Quick healthy morning meal prep using spiced paneer and oats.",
+      "transcript": "Saute paneer cubes with turmeric, pair with savory oats for thirty grams of protein in ten minutes.",
+      "tags": ["recipe", "protein", "vegetarian", "breakfast"],
+      "author_name": "fit_kitchen"
+    },
+    {
+      "id": "reel_hypertrophy_workout",
+      "platform": "instagram_reel",
+      "caption": "Upper body strength routine for busy people",
+      "summary": "35-minute gym workout focused on progressive overload and muscle hypertrophy.",
+      "transcript": "Focus on compound lifts like weighted pullups and incline dumbbell press to build upper body muscle.",
+      "tags": ["gym", "workout", "strength", "hypertrophy"],
+      "author_name": "iron_coach"
+    },
+    {
+      "id": "reel_index_funds",
+      "platform": "youtube_video",
+      "caption": "How compounding works in long-term index fund investing",
+      "summary": "Personal finance breakdown of automated monthly investing, tax efficiency, and wealth building.",
+      "transcript": "Automating monthly contributions into low-cost index funds lets compound returns build long-term wealth.",
+      "tags": ["finance", "investing", "stocks", "wealth"],
+      "author_name": "money_clarity"
+    },
+    {
+      "id": "reel_obsidian_notes",
+      "platform": "youtube_short",
+      "caption": "My second brain workflow for retaining what I study",
+      "summary": "Productivity system combining Pomodoro focus blocks with linked Obsidian notes.",
+      "transcript": "After a twenty-five minute focus session, summarize key takeaways into atomic linked notes.",
+      "tags": ["productivity", "study", "obsidian", "workflow"],
+      "author_name": "study_lab"
+    },
+    {
+      "id": "reel_scifi_watchlist",
+      "platform": "instagram_reel",
+      "caption": "Underrated mind-bending thriller movies on Netflix",
+      "summary": "Curated cinema watchlist of psychological sci-fi films with twist endings.",
+      "transcript": "If you loved Dark or Inception, these three cerebral sci-fi thrillers belong at the top of your watchlist.",
+      "tags": ["movies", "scifi", "thriller", "watchlist"],
+      "author_name": "cinema_buff"
+    },
+    {
+      "id": "reel_rag_embeddings",
+      "platform": "youtube_video",
+      "caption": "Building semantic search with pgvector and LLM embeddings",
+      "summary": "Technical walkthrough of vector similarity, HNSW indexes, and hybrid RRF retrieval.",
+      "transcript": "Combine dense vector embeddings in PostgreSQL pgvector with full-text search using reciprocal rank fusion.",
+      "tags": ["ai", "embeddings", "pgvector", "rag"],
+      "author_name": "ml_builder"
+    }
+  ],
+  "queries": [
+    {
+      "query": "that video about packaging backend services and running pods in production",
+      "relevant": {
+        "reel_docker_k8s": 2,
+        "reel_rag_embeddings": 1
+      }
+    },
+    {
+      "query": "quick vegetarian morning meal with lots of protein",
+      "relevant": {
+        "reel_paneer_breakfast": 2
+      }
+    },
+    {
+      "query": "gym exercises to build upper body muscle fast",
+      "relevant": {
+        "reel_hypertrophy_workout": 2
+      }
+    },
+    {
+      "query": "long term passive wealth building through monthly stock market investing",
+      "relevant": {
+        "reel_index_funds": 2
+      }
+    },
+    {
+      "query": "how to take better study notes and stay focused",
+      "relevant": {
+        "reel_obsidian_notes": 2
+      }
+    },
+    {
+      "query": "mind bending sci fi thriller movie recommendations",
+      "relevant": {
+        "reel_scifi_watchlist": 2
+      }
+    },
+    {
+      "query": "how vector search and hybrid ranking work in postgres",
+      "relevant": {
+        "reel_rag_embeddings": 2,
+        "reel_docker_k8s": 1
+      }
+    }
+  ]
+}

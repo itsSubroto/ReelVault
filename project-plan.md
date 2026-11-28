@@ -84,8 +84,29 @@ Yeh ek **learning project** bhi hai — do log alag-alag stacks (Java/Spring Boo
   - Deduplicate reels across multiple collections by `shortcode` so each video appears only once in the "All Reels" home view and search results.
   - Native in-platform HTML5 video player and sandboxed embed frame preventing third-party redirects to Instagram.
   - Direct video streaming proxy endpoint (`/api/reels/{id}/stream`).
-- [ ] Better search ranking — move from basic keyword match to Postgres full-text ranking or embeddings-based semantic search
+- [x] Better search ranking — PostgreSQL `pgvector` semantic embeddings + full-text search (`tsvector` + GIN) fused via Reciprocal Rank Fusion (RRF)
 - [ ] Rate-limiting / cost controls on the AI pipeline (Whisper + LLM calls)
+
+---
+
+## Phase 4 — Semantic Search (Implemented on `feature_semantic_search`)
+
+**Goal:** Let users describe what they remember or need in natural language and automatically retrieve the most relevant Instagram Reels, YouTube Videos, and YouTube Shorts without manual mode toggles.
+
+- [x] **pgvector Database Schema & Flyway Migrations**:
+  - Docker image switched to `pgvector/pgvector:pg18`.
+  - Flyway migrations `V1__baseline.sql` and `V2__add_semantic_search_pgvector.sql` add `vector(768)` column, HNSW cosine index, and full-text GIN index.
+- [x] **768-d Embedding Pipeline (`ai-service/services/embedding_service.py`)**:
+  - Hybrid provider chain: Gemini (`gemini-embedding-001`) → OpenAI (`text-embedding-3-small`) → deterministic local concept-bridged 768-d fallback.
+  - Automatic embedding generation on reel enrichment (`ai_pipeline.py`) and embedding reuse when copying processed reels across collections.
+- [x] **Hybrid Search & RRF Ranking (`SearchService`, `ReelVectorRepository`)**:
+  - Seamless `hybrid` search combining semantic cosine similarity + weighted PostgreSQL full-text search via RRF (`k=60`).
+  - Automatic keyword fallback when semantic retrieval is unavailable.
+- [x] **Backfill & Admin Controls**:
+  - Protected `/api/admin/embeddings/status` & `/api/admin/embeddings/backfill` endpoints (`X-Admin-Secret`).
+  - Standalone `ai-service/backfill_embeddings.py` script for existing reels.
+- [x] **IR Evaluation Suite (`ai-service/eval/`)**:
+  - Curated benchmark (`dataset.json`) and evaluation script (`evaluate_search.py`) reporting `Recall@1/3/5`, `MRR`, and `NDCG@5`.
 
 **Not planned yet, revisit only if Phase 3 is reached:** native Android/iOS app, public multi-tenant product, monetization.
 

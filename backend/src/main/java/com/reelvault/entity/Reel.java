@@ -63,6 +63,17 @@ public class Reel {
     @Builder.Default
     private List<String> tags = new ArrayList<>();
 
+    @Column(name = "embedding_model", length = 100)
+    private String embeddingModel;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "embedding_status", nullable = false, length = 20)
+    @Builder.Default
+    private EmbeddingStatus embeddingStatus = EmbeddingStatus.PENDING;
+
+    @Column(name = "embedding_updated_at")
+    private Instant embeddingUpdatedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -75,6 +86,9 @@ public class Reel {
         this.updatedAt = Instant.now();
         if (this.status == null) {
             this.status = ReelStatus.SAVED;
+        }
+        if (this.embeddingStatus == null) {
+            this.embeddingStatus = EmbeddingStatus.PENDING;
         }
     }
 

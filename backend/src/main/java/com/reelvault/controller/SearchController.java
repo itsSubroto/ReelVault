@@ -19,7 +19,9 @@ public class SearchController {
     @GetMapping
     public ResponseEntity<List<ReelResponse>> search(
             @RequestParam(required = false, defaultValue = "") String q,
-            @RequestParam(required = false) UUID collectionId) {
-        return ResponseEntity.ok(searchService.search(q, collectionId));
+            @RequestParam(required = false) UUID collectionId,
+            @RequestParam(required = false, defaultValue = "hybrid") String mode,
+            @RequestParam(required = false, defaultValue = "30") int limit) {
+        return ResponseEntity.ok(searchService.search(q, collectionId, mode, limit));
     }
 }

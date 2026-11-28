@@ -5,12 +5,15 @@ import com.reelvault.dto.ReelRequest;
 import com.reelvault.dto.ReelResponse;
 import com.reelvault.dto.ReelUpdateRequest;
 import com.reelvault.entity.Collection;
+import com.reelvault.entity.EmbeddingStatus;
 import com.reelvault.entity.Reel;
 import com.reelvault.entity.ReelStatus;
 import com.reelvault.exception.BadRequestException;
 import com.reelvault.exception.ResourceNotFoundException;
 import com.reelvault.repository.ReelRepository;
+import com.reelvault.repository.ReelVectorRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -32,19 +35,25 @@ import java.util.concurrent.CompletableFuture;
 public class ReelService {
 
     private final ReelRepository reelRepository;
+    private final ReelVectorRepository reelVectorRepository;
     private final CollectionService collectionService;
     private final InstagramService instagramService;
     private final ObjectMapper objectMapper;
+    private final String aiServiceUrl;
 
     public ReelService(
             ReelRepository reelRepository,
+            ReelVectorRepository reelVectorRepository,
             CollectionService collectionService,
             InstagramService instagramService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Value("${reelvault.ai-service.url:http://localhost:8000}") String aiServiceUrl) {
         this.reelRepository = reelRepository;
+        this.reelVectorRepository = reelVectorRepository;
         this.collectionService = collectionService;
         this.instagramService = instagramService;
         this.objectMapper = objectMapper;
+        this.aiServiceUrl = aiServiceUrl.endsWith("/") ? aiServiceUrl.substring(0, aiServiceUrl.length() - 1) : aiServiceUrl;
     }
 
     @Transactional
@@ -85,9 +94,13 @@ public class ReelService {
                     .summary(existing.getSummary())
                     .tags(existing.getTags() != null ? new ArrayList<>(existing.getTags()) : new ArrayList<>())
                     .status(ReelStatus.DONE)
+                    .embeddingModel(existing.getEmbeddingModel())
+                    .embeddingStatus(existing.getEmbeddingStatus())
+                    .embeddingUpdatedAt(existing.getEmbeddingUpdatedAt())
                     .build();
 
-            Reel saved = reelRepository.save(reel);
+            Reel saved = reelRepository.saveAndFlush(reel);
+            reelVectorRepository.copyEmbedding(existing.getId(), saved.getId());
             return toResponse(saved);
         }
 
@@ -204,8 +217,28 @@ public class ReelService {
         if (request.status() != null) {
             reel.setStatus(request.status());
         }
+        if (request.embeddingModel() != null) {
+            reel.setEmbeddingModel(request.embeddingModel());
+        }
+        if (request.embeddingStatus() != null) {
+            reel.setEmbeddingStatus(request.embeddingStatus());
+            reel.setEmbeddingUpdatedAt(java.time.Instant.now());
+        }
 
-        Reel updated = reelRepository.save(reel);
+        Reel updated = reelRepository.saveAndFlush(reel);
+
+        if (request.embedding() != null && !request.embedding().isEmpty()) {
+            float[] vec = new float[request.embedding().size()];
+            for (int i = 0; i < request.embedding().size(); i++) {
+                vec[i] = request.embedding().get(i).floatValue();
+            }
+            EmbeddingStatus embStatus = request.embeddingStatus() != null
+                    ? request.embeddingStatus()
+                    : EmbeddingStatus.DONE;
+            reelVectorRepository.saveEmbedding(updated.getId(), vec, request.embeddingModel(), embStatus);
+            updated = findEntityById(updated.getId());
+        }
+
         return toResponse(updated);
     }
 
@@ -225,7 +258,7 @@ public class ReelService {
             HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    "http://ai-service:8000/api/reprocess-all/",
+                    aiServiceUrl + "/api/reprocess-all/",
                     entity,
                     Map.class
             );
@@ -252,7 +285,7 @@ public class ReelService {
                 headers.setContentLength(jsonBody.getBytes(StandardCharsets.UTF_8).length);
                 HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
-                restTemplate.postForEntity("http://ai-service:8000/api/process-reel/", entity, String.class);
+                restTemplate.postForEntity(aiServiceUrl + "/api/process-reel/", entity, String.class);
                 log.info("Successfully triggered AI service for reel: {}", reelId);
             } catch (Exception e) {
                 log.warn("Python AI service notification error for reel {}: {}", reelId, e.getMessage());
@@ -311,7 +344,12 @@ public class ReelService {
                 reel.getSummary(),
                 reel.getTags() != null ? reel.getTags() : List.of(),
                 reel.getCreatedAt(),
-                reel.getUpdatedAt()
+                reel.getUpdatedAt(),
+                reel.getEmbeddingModel(),
+                reel.getEmbeddingStatus(),
+                null,
+                null,
+                null
         );
     }
 }

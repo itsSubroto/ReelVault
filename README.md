@@ -1,6 +1,6 @@
 # ReelVault 🎬
 
-ReelVault is a full-stack web application designed to save and organize Instagram reels into collections and instantly find them using keyword search over captions, speech transcripts, and AI summaries.
+ReelVault is a full-stack web application designed to save and organize Instagram Reels, YouTube Videos, and YouTube Shorts into collections and instantly find them using **hybrid semantic + full-text search** over captions, speech transcripts, AI summaries, and tags.
 
 ---
 
@@ -121,7 +121,35 @@ docker compose up --build
 
 ---
 
+## Semantic Search & Embeddings
+
+ReelVault uses **PostgreSQL + `pgvector` (`pgvector/pgvector:pg18`)** with **768-dimensional embeddings** and **Reciprocal Rank Fusion (RRF)** to automatically combine semantic meaning with exact keyword matching—no separate search engine (like Elasticsearch) or UI mode toggle is required.
+
+### Environment Variables
+- `GEMINI_API_KEY` *(optional)*: Primary embedding provider (`gemini-embedding-001`, 768-d).
+- `OPENAI_API_KEY` *(optional)*: Secondary embedding provider (`text-embedding-3-small`, 768-d).
+- If neither key is set, `ai-service` automatically falls back to a deterministic local 768-d semantic hash embedder.
+- `ADMIN_API_SECRET`: Secret header (`X-Admin-Secret`) protecting `/api/admin/embeddings/*` endpoints (default `reelvault-admin-secret` for local dev).
+
+### Backfilling Existing Reels
+```bash
+# Via Python CLI in ai-service/
+cd ai-service
+python backfill_embeddings.py
+
+# Or via Backend Admin API
+curl -X POST http://localhost:8080/api/admin/embeddings/backfill -H "X-Admin-Secret: reelvault-admin-secret"
+```
+
+### Search Quality Evaluation (Recall@K, MRR, NDCG@5)
+```bash
+cd ai-service
+python eval/evaluate_search.py
+```
+
+---
+
 ## Running Tests
 
 - **Backend:** `cd backend && ./mvnw test`
-- **AI Service:** `cd ai-service && pytest`
+- **AI Service:** `cd ai-service && python -m pytest`

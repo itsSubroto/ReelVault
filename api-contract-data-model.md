@@ -52,6 +52,10 @@ An Instagram reel saved by the user, belonging to a collection.
 | `transcript` | `TEXT` | NULLABLE | Audio transcription (Phase 2) |
 | `summary` | `TEXT` | NULLABLE | AI-generated summary (Phase 2) |
 | `tags` | `TEXT[]` / `JSONB` | NULLABLE | AI-generated tags (Phase 2) |
+| `embedding` | `vector(768)` | NULLABLE | 768-dimensional semantic vector (pgvector HNSW indexed) |
+| `embedding_model` | `VARCHAR(100)` | NULLABLE | Embedding model identifier (e.g. `gemini-embedding-001`, `text-embedding-3-small`, `local-semantic-hash-768`) |
+| `embedding_status` | `VARCHAR(20)` | NOT NULL, DEFAULT 'PENDING' | Embedding pipeline status: `PENDING`, `PROCESSING`, `DONE`, `FAILED` |
+| `embedding_updated_at` | `TIMESTAMP WITH TIME ZONE` | NULLABLE | Timestamp of last embedding generation |
 | `created_at` | `TIMESTAMP WITH TIME ZONE` | NOT NULL | Date reel was saved |
 | `updated_at` | `TIMESTAMP WITH TIME ZONE` | NOT NULL | Last update timestamp |
 
@@ -230,16 +234,35 @@ Base path: `/api`
 
 ### 2.4 Search API
 
-#### 2.3.1 Search Reels by Keyword
+#### 2.4.1 Hybrid Semantic & Keyword Search
 - **Method:** `GET`
 - **Path:** `/api/search`
 - **Query Parameters:**
-  - `q` *(required, string)*: Search keyword or phrase.
+  - `q` *(required, string)*: Natural-language context description, topic, or keyword phrase.
   - `collectionId` *(optional, UUID)*: Restrict search to a specific collection.
+  - `mode` *(optional, string, default `hybrid`)*: Retrieval strategy (`hybrid`, `semantic`, `keyword`). The frontend uses `hybrid` automatically so users do not need to pick a mode.
+  - `limit` *(optional, int, default `30`, max `100`)*: Maximum results returned.
 - **Behavior:**
-  - In Phase 1: Matches against `caption` (case-insensitive substring and full-text).
-  - In Phase 2: Extends match to `caption`, `transcript`, `summary`, and `tags`.
+  - Executes PostgreSQL full-text search (`tsvector` + GIN index across `caption`, `summary`, `transcript`, `author_name`, and `tags`) and `pgvector` cosine similarity search (`<=>` with HNSW index) in parallel, fusing rankings with **Reciprocal Rank Fusion (RRF, k=60)**.
+  - Gracefully degrades to keyword results if the AI embedding service is temporarily unreachable.
+  - Response items include `matchType` (`Hybrid Match`, `Semantic Match`, `Keyword Match`), `similarityScore`, and `rrfScore`.
 - **Response:** `200 OK`
+
+---
+
+### 2.5 Admin Embeddings API (Protected by `X-Admin-Secret`)
+
+#### 2.5.1 Embedding Status Summary
+- **Method:** `GET`
+- **Path:** `/api/admin/embeddings/status`
+- **Header:** `X-Admin-Secret: <ADMIN_API_SECRET>`
+- **Response:** `200 OK` (`totalReels`, `statusCounts`)
+
+#### 2.5.2 Trigger Embedding Backfill
+- **Method:** `POST`
+- **Path:** `/api/admin/embeddings/backfill?force=false&batchSize=16&limit=500`
+- **Header:** `X-Admin-Secret: <ADMIN_API_SECRET>`
+- **Response:** `200 OK` (`totalCandidates`, `processed`, `succeeded`, `failed`, `model`, `statusCounts`)
 
 ---
 
