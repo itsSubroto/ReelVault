@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:18-alpine
+    image: pgvector/pgvector:pg18
     container_name: reelvault-postgres
     restart: unless-stopped
     environment:
@@ -24,6 +24,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/reelvault
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: password
+      AI_SERVICE_URL: http://ai-service:8000
+      ADMIN_API_SECRET: ${ADMIN_API_SECRET:-reelvault-admin-secret}
     ports:
       - "8080:8080"
 
@@ -38,6 +40,8 @@ services:
     environment:
       SPRING_BOOT_URL: http://backend:8080
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ADMIN_API_SECRET: ${ADMIN_API_SECRET:-reelvault-admin-secret}
     ports:
       - "8000:8000"
 

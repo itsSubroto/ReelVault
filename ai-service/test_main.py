@@ -63,3 +63,28 @@ def test_process_reel_endpoint():
         data = response.json()
         assert data["status"] == "ACCEPTED"
         assert data["reel_id"] == payload["reel_id"]
+
+
+def test_embeddings_endpoint_and_semantic_similarity():
+    from services.embedding_service import EmbeddingService, EMBEDDING_DIMENSION
+    import math
+
+    # Local fallback works even without external API keys
+    with patch.dict("os.environ", {"GEMINI_API_KEY": "", "OPENAI_API_KEY": ""}, clear=False):
+        res1 = client.post("/api/embeddings", json={
+            "text": "Docker container orchestration with Kubernetes pods for microservices",
+            "task_type": "RETRIEVAL_DOCUMENT"
+        })
+        assert res1.status_code == 200
+        d1 = res1.json()
+        assert d1["dimensions"] == EMBEDDING_DIMENSION
+        assert len(d1["embedding"]) == EMBEDDING_DIMENSION
+        norm = math.sqrt(sum(x * x for x in d1["embedding"]))
+        assert abs(norm - 1.0) < 1e-4
+
+        vec_query, _ = EmbeddingService.generate_embedding("how to deploy containers using k8s", task_type="RETRIEVAL_QUERY")
+        vec_unrelated, _ = EmbeddingService.generate_embedding("paneer tikka masala recipe for dinner", task_type="RETRIEVAL_DOCUMENT")
+
+        sim_related = sum(a * b for a, b in zip(d1["embedding"], vec_query))
+        sim_unrelated = sum(a * b for a, b in zip(vec_unrelated, vec_query))
+        assert sim_related > sim_unrelated

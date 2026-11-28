@@ -181,8 +181,15 @@ export default function ReelCard({
         </div>
 
         {/* Status Tag (Bottom Left) */}
-        <div className="absolute bottom-3 left-3 pointer-events-none">
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 pointer-events-none">
           {getStatusBadge()}
+          {searchQuery && reel.matchType && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-violet-600/30 text-violet-200 border border-violet-400/40 backdrop-blur-md">
+              {reel.similarityScore != null
+                ? `${Math.round(reel.similarityScore * 100)}% match`
+                : 'Keyword match'}
+            </span>
+          )}
         </div>
       </div>
 

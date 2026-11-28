@@ -22,8 +22,18 @@ spring:
           lob:
             non_contextual_creation: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
+
 reelvault:
   jwt:
     secret: ${JWT_SECRET:reelvault-secure-jwt-secret-key-32-chars-minimum!}
   instagram:
     access-token: ${INSTAGRAM_ACCESS_TOKEN:}
+  ai-service:
+    url: ${AI_SERVICE_URL:http://localhost:8000}
+  admin:
+    secret: ${ADMIN_API_SECRET:reelvault-admin-secret}

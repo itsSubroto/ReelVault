@@ -1,5 +1,6 @@
 package com.reelvault.dto;
 
+import com.reelvault.entity.EmbeddingStatus;
 import com.reelvault.entity.ReelStatus;
 
 import java.time.Instant;
@@ -21,5 +22,35 @@ public record ReelResponse(
     String summary,
     List<String> tags,
     Instant createdAt,
-    Instant updatedAt
-) {}
+    Instant updatedAt,
+    String embeddingModel,
+    EmbeddingStatus embeddingStatus,
+    String matchType,
+    Double similarityScore,
+    Double rrfScore
+) {
+    public ReelResponse withSearchMeta(String matchType, Double similarityScore, Double rrfScore) {
+        return new ReelResponse(
+                id,
+                collectionId,
+                collectionName,
+                instagramUrl,
+                shortcode,
+                caption,
+                thumbnailUrl,
+                videoUrl,
+                authorName,
+                status,
+                transcript,
+                summary,
+                tags,
+                createdAt,
+                updatedAt,
+                embeddingModel,
+                embeddingStatus,
+                matchType,
+                similarityScore,
+                rrfScore
+        );
+    }
+}

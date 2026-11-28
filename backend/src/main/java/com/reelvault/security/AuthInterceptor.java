@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -21,6 +22,9 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+
+    @Value("${reelvault.admin.secret:reelvault-admin-secret}")
+    private String adminSecret;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -65,13 +69,31 @@ public class AuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // 5. Protected endpoints (including /api/auth/me, /api/reels, /api/collections, /api/search):
+        // 5. Protected admin endpoints require valid X-Admin-Secret header
+        if (uri.startsWith("/api/admin")) {
+            String providedSecret = request.getHeader("X-Admin-Secret");
+            if (adminSecret != null && !adminSecret.isBlank() && adminSecret.equals(providedSecret)) {
+                return true;
+            }
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            response.setCharacterEncoding("UTF-8");
+            Map<String, Object> forbiddenBody = Map.of(
+                    "status", HttpServletResponse.SC_FORBIDDEN,
+                    "error", "Forbidden",
+                    "message", "Valid X-Admin-Secret header is required for administrative endpoints"
+            );
+            response.getWriter().write(objectMapper.writeValueAsString(forbiddenBody));
+            return false;
+        }
+
+        // 6. Protected endpoints (including /api/auth/me, /api/reels, /api/collections, /api/search):
         // Must have an authenticated user in context
         if (UserContext.getCurrentUser() != null) {
             return true;
         }
 
-        // 6. Unauthorized response
+        // 7. Unauthorized response
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
